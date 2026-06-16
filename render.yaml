@@ -22,7 +22,7 @@ services:
     runtime: python
     plan: free
     region: oregon
-    branch: main
+    branch: master
     # Editable install of the project + the `mcp` extra (FastMCP / streamable-http)
     # required by agentdata.asgi. fastapi/uvicorn come from pyproject deps.
     buildCommand: pip install ".[mcp]"
