@@ -5,7 +5,7 @@ These lock the things a human deployment depends on (CEO handoff, ADR-001 §6):
 * ``agentdata.asgi:app`` is ONE ASGI app that serves the existing REST surface
   (``/health``, ``/pricing``, ``/v1/liquidity/exit-cost``) AND mounts the MCP
   streamable-http endpoint under ``/mcp`` on a single port.
-* ``server.json`` is valid, carries the Phenicea namespace, the current registry
+* ``server.json`` is valid, carries the interim 0xcssh namespace, the current registry
   ``$schema`` (2025-12-11), and ``name`` matches ``package.json``'s ``mcpName``
   (registry invariant).
 * No mainnet value is active by default (testnet lock intact).
@@ -38,7 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SERVER_JSON = _REPO_ROOT / "server.json"
 _PACKAGE_JSON = _REPO_ROOT / "package.json"
 
-_EXPECTED_NAME = "io.github.phenicea/agentdata-liquidity-exit-cost"
+_EXPECTED_NAME = "io.github.0xcssh/agentdata-liquidity-exit-cost"
 _EXPECTED_SCHEMA = (
     "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
 )
@@ -129,13 +129,15 @@ class TestServerManifest(unittest.TestCase):
         data = json.loads(_SERVER_JSON.read_text(encoding="utf-8"))
         self.assertEqual(data.get("$schema"), _EXPECTED_SCHEMA)
 
-    def test_server_json_namespace_is_phenicea(self):
+    def test_server_json_namespace(self):
+        # Interim namespace under the authenticated GitHub account (0xcssh). The
+        # Phenicea org migration is a later, registry-supported re-publish.
         data = json.loads(_SERVER_JSON.read_text(encoding="utf-8"))
         name = data.get("name", "")
         self.assertEqual(name, _EXPECTED_NAME)
         self.assertTrue(
-            name.startswith("io.github.phenicea/"),
-            f"namespace must be io.github.phenicea/..., got {name!r}",
+            name.startswith("io.github.0xcssh/"),
+            f"namespace must be io.github.0xcssh/..., got {name!r}",
         )
 
     def test_name_matches_package_mcp_name(self):

@@ -579,3 +579,77 @@ exit-cost` 200, **`POST /mcp initialize` → 200** (handshake MCP JSON-RPC valid
 
 **Handoff :** code 100 % deploy-ready (testnet). Reste humain : org GitHub + déploiement Render + 3 j uptime + publish.
 E2E testnet (option C) attend le wallet Base Sepolia financé. Mainnet toujours verrouillé (double garde).
+
+## 2026-06-16 — CEO — Repo/namespace : pousser MAINTENANT sous 0xcssh (intérimaire), garder Phenicea comme cible (supersède partiellement le namespace figé de l'entrée « Phase 3b »)
+
+**Décision :**
+
+**1. Repo & namespace — Option A retenue (pousser maintenant sous `0xcssh`), avec garde-fou de migration explicite.**
+- **POUSSER MAINTENANT** le code sous `github.com/0xcssh/agentdata` (l'agent peut le faire seul : `gh` authentifié sur `0xcssh`, scopes repo/workflow suffisent). On ne reste PAS bloqués à attendre la création d'org.
+- **Namespace MCP intérimaire = `io.github.0xcssh/agentdata-liquidity-exit-cost`** dans `server.json.name` ET `package.json.mcpName` (l'invariant registre « name === mcpName » doit rester respecté). Idem `repository.url`, `websiteUrl`, `homepage`, `bugs.url` → `0xcssh` (sinon ces URLs sont des 404, ce qui DÉGRADE la crédibilité lue par un agent — un repo réel et public > une jolie URL morte).
+- **Phenicea reste la cible de marque durable**, mais on ne fige plus `io.github.phenicea/...` dans le code TANT QUE l'org n'existe pas (l'entrée « Phase 3b » figeait Phenicea ; elle est **superseded sur ce point précis** : le namespace effectif au push est `0xcssh`, Phenicea redevient une cible de migration, pas une valeur committée). Raison du retournement : fait technique nouveau = l'org n'est pas créable par l'agent → figer un namespace non-authentifiable bloque la publication ; un namespace authentifiable maintenant fait courir l'uptime maintenant.
+- **Coût de migration vers Phenicea = faible et planifié** : le registre permet de republier (nouvelle entrée qui supersède), et le repo se transfère/forke (`gh repo transfer` ou recréation sous l'org). C'est de la config + re-listing, **pas une réécriture de code**. On l'assume.
+
+**2. Repo PUBLIC au push (pas privé — Option C écartée).**
+- Le listing MCP référence `repository.url` ; un agent (et un humain qui évalue) peut lire le repo. **Public = crédibilité + lisibilité par agent** (CLAUDE.md §10 : la doc/le code lisibles directement comptent pour être *choisi*). Un repo privé derrière auth = invisible au lecteur machine = anti-découvrabilité.
+- Rien dans le repo n'expose d'argent réel : `.gitignore` exclut les secrets, aucune clé wallet committée, mode testnet par défaut, garde-fous mainnet doubles (vérifié entrée Phase 2). Donc aucun risque à le rendre public. (Si un doute subsiste sur un secret résiduel → cto-agent fait un scan avant `git push` ; voir Handoff.)
+- Privé « pour préparer » (Option C) n'apporte rien ici : ça retarde le bénéfice de crédibilité sans réduire un risque réel, et il faudra le rendre public de toute façon pour le listing.
+
+**3. Ce qu'on demande au fondateur, dans l'ordre (du plus débloquant au moins urgent) :**
+- **(P1 — débloque l'uptime, le plus urgent) Déployer sur Render** sous son compte (Render exige le compte fondateur). C'est ce qui fait *démarrer le compteur 3 j* — le vrai goulot. Sans déploiement, ni 0xcssh ni phenicea ne changent quoi que ce soit.
+- **(P2 — débloque la marque, non bloquant pour l'uptime) Créer l'org GitHub `phenicea`** (+ réserver le scope npm `@phenicea`). Dès qu'elle existe, on migre le namespace `0xcssh → phenicea` (re-listing). Si `phenicea` est pris → `phenicea-ai`/`phenicea-labs`.
+- **(P3 — inchangé, parallèle) Wallet Base Sepolia financé** pour l'E2E testnet → prérequis listing #2 (Bazaar). N'affecte pas le listing #1.
+- Ordre justifié : le North Star des premiers mois = fiabilité + découvrabilité + historique d'uptime qui court. Le déploiement (P1) est le seul qui fait courir le temps ; la marque (P2) est durable mais non bloquante et migrable ; le wallet (P3) sert un listing ultérieur.
+
+**Pourquoi :**
+- **Vitesse > esthétique de marque au stade actuel.** Le namespace n'est PAS un critère mécanique de sélection des agents (prix/latence/fiabilité/schéma le sont — CLAUDE.md §10, et North Star §3 de ma définition). Or l'historique d'uptime, lui, EST un actif qui se construit dans le temps réel et qu'on ne peut pas rattraper. Chaque jour d'attente sous Option B = un jour d'historique perdu pour zéro gain de sélection. Mauvais arbitrage.
+- **Un repo réel sous 0xcssh > un namespace phenicea fantôme.** Ce qu'un agent « voit » de mieux, ce n'est pas le mot « phenicea » dans une chaîne — c'est un repo public lisible, une doc markdown brute, un schéma propre, un endpoint qui répond 200. Option A délivre tout ça maintenant ; Option B délivre une belle chaîne pointant vers du vide.
+- **La migration est bon marché et le registre est conçu pour ça** (supersede). On ne se peint pas dans un coin : on garde Phenicea comme destination, on y va dès que l'org existe, sans bloquer le chemin critique entre-temps.
+- **Pleinement dans mon mandat** : tout est gratuit, testnet, réversible. Aucune dépense, aucun mainnet, aucun vrai USDC. Pousser un repo public et figer un namespace authentifiable = décisions business/distribution = mon domaine.
+
+**Hypothèses & risques :**
+- Hypothèse : `0xcssh/agentdata` n'existe pas déjà / le nom est libre sous ce compte. Sinon → suffixe (`agentdata-mcp`) et ajuster les URLs en conséquence.
+- Risque : on publie le listing #1 sous `io.github.0xcssh/...` puis on migre vers phenicea → **double entrée registre / churn de namespace** visible. Mitigé : (a) on n'aura probablement pas encore `mcp-publisher publish` (le gate 3 j + l'auth GitHub ne tombent qu'après) — donc l'idéal est de **migrer AVANT le publish si l'org phenicea arrive à temps** ; (b) si phenicea n'est pas prête au moment du feu vert 3 j, on publie sous 0xcssh (mieux vaut listé que pas listé) et on supersède plus tard. **Règle de décision** : publier sous le namespace de la marque si elle est prête à l'instant du publish ; sinon publier sous 0xcssh sans attendre.
+- Risque : exposition publique de code immature (testnet/preview) → réputation. Mitigé par le libellé honnête « Testnet / preview » déjà présent dans la description, et par le fait que le code est testé (103 tests verts).
+- Risque secret résiduel dans l'historique git au moment du push public → cto-agent scanne avant push (gitleaks/`git log` des fichiers sensibles). `.gitignore` déjà en place mais on vérifie l'historique, pas juste le working tree.
+- Risque identité : pousser sous le compte perso du fondateur (`0xcssh`) lie le projet à son identité GitHub perso plutôt qu'à une marque neutre. Acceptable au stade testnet/preview ; résolu par la migration vers l'org `phenicea`.
+
+**Succès mesuré par :**
+- Repo public live sous `github.com/0xcssh/agentdata`, lisible (README, docs markdown, llms.txt visibles), zéro secret committé (scan propre).
+- `server.json.name` === `package.json.mcpName` === `io.github.0xcssh/agentdata-liquidity-exit-cost` ; plus aucune URL pointant vers `phenicea` (404) tant que l'org n'existe pas ; `repository.url`/`websiteUrl` résolvent en 200.
+- Déclencheur listing #1 armé une fois Render déployé : **3 j d'uptime applicatif sans régression de schéma** → publish (sous phenicea si prête, sinon 0xcssh).
+- Migration : quand l'org phenicea existe, repo transféré + namespace re-figé en `io.github.phenicea/...` + (si déjà listé) nouvelle entrée registre qui supersède. Coût = config/re-listing, pas de réécriture.
+
+**Handoff :** voir bloc Handoff CTO + demandes humaines ci-dessous.
+
+## 2026-06-16 — CEO — Handoff consolidé → cto-agent (push 0xcssh, repo public, namespace intérimaire)
+
+À traiter par `cto-agent` (le « comment »). **Aucune touche mainnet, aucune dépense, tout réversible.**
+
+**A. Re-figer le namespace en intérimaire `0xcssh` (avant le push) :**
+1. `server.json` : `name` → `io.github.0xcssh/agentdata-liquidity-exit-cost` ; `websiteUrl` et `repository.url` → `https://github.com/0xcssh/agentdata` (et `.url` du repo). NE PAS toucher `remotes[0].url` (reste `PLACEHOLDER-RENDER-HOST` jusqu'au déploiement Render — étape humaine P1).
+2. `package.json` : `name` → `@0xcssh/agentdata-liquidity-exit-cost` (ou garder un nom local non-scopé si `@0xcssh` pose souci — npm non requis pour le listing #1, c'est de la réservation) ; `mcpName` → `io.github.0xcssh/agentdata-liquidity-exit-cost` (DOIT être identique à `server.json.name`) ; `repository.url`, `homepage`, `bugs.url` → `0xcssh`.
+3. Vérifier l'invariant : `server.json.name` === `package.json.mcpName`.
+4. Laisser le code clairement migrable : pas de hardcode du namespace ailleurs que dans ces deux manifests (de sorte que la future migration phenicea = éditer 2 fichiers + transfert repo).
+
+**B. Pré-push (sécurité, bloquant avant `git push` public) :**
+5. **Scanner l'historique git ET le working tree** pour tout secret avant de rendre public : clés wallet, `.env` réel, `FACILITATOR_URL`/`PAY_TO_ADDRESS` non-placeholder, tokens. Confirmer que `.gitignore` exclut bien `.env` et secrets (déjà noté en place — re-vérifier l'historique, pas que le HEAD). Si un secret a déjà été committé → ne PAS pousser, nettoyer l'historique d'abord (ou repartir d'un repo neuf sans historique sale).
+6. Vérifier que `NETWORK_MODE=testnet` par défaut, `ALLOW_MAINNET` absent, `X402_ENABLED=false` par défaut, garde-fous mainnet doubles intacts (entrée Phase 2) — rien ne doit exposer d'argent réel dans un repo public.
+
+**C. Créer + pousser le repo PUBLIC sous 0xcssh :**
+7. `gh repo create 0xcssh/agentdata --public` (vérifier d'abord que le nom est libre ; sinon `agentdata-mcp` et ajuster les URLs de A). Pousser le code (branche par défaut). Vérifier que README, `llms.txt`, `docs/api.md`, OpenAPI sont visibles dans le repo public et que `repository.url`/`websiteUrl` résolvent en 200.
+8. **Ne pas** publier sur npm ni `mcp-publisher publish` maintenant (le publish attend le déploiement Render + 3 j uptime, et idéalement le namespace de marque). Le push repo n'est PAS la publication registre.
+
+**D. Après déploiement Render (étape humaine P1) — inchangé vs entrée précédente :**
+9. Quand l'URL Render est connue : `remotes[0].url` = `https://<render-host>/mcp` ; OpenAPI `servers[]` + liens absolus `llms.txt` → host public ; rejouer le test discovery contre l'URL publique (tous liens 200). Keep-alive gratuit (cron-job.org / UptimeRobot) sur `/health` ~10 min.
+10. Laisser courir le monitoring → **3 j uptime sans régression de schéma** → feu vert publish.
+
+**E. Migration phenicea (quand l'org existe — étape humaine P2) :**
+11. `gh repo transfer` (ou recréation) `0xcssh/agentdata → phenicea/agentdata` ; re-figer `server.json.name`/`package.json.mcpName` en `io.github.phenicea/agentdata-liquidity-exit-cost` ; mettre à jour les URLs repo. Si déjà listé au registre sous 0xcssh → nouvelle entrée phenicea qui supersède (re-listing, pas réécriture).
+12. **Règle de timing du publish** : si l'org phenicea est prête à l'instant où le gate 3 j tombe → publier directement sous phenicea (éviter le double-listing). Sinon → publier sous 0xcssh sans attendre, migrer ensuite.
+
+**F. Escalades humaines (ne PAS décider côté agents) :**
+- **P1 (déploiement Render)** : compte fondateur requis → action humaine. C'est le déblocage prioritaire (fait courir l'uptime).
+- **P2 (org GitHub `phenicea` + scope npm `@phenicea`)** : création web only → action humaine. Non bloquant pour le push 0xcssh ni pour l'uptime.
+- **P3 (wallet Base Sepolia financé)** : inchangé → débloque E2E testnet → listing #2 Bazaar.
+- **Inchangé** : plan payant (si free tier ne tient pas 3 j), domaine custom (marque), mainnet/vrai USDC → tous escalade humain. Mainnet verrouillé (double garde).
