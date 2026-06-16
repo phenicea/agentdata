@@ -23,11 +23,20 @@ from agentdata.safety import guard_network
 from .pricing import DEFAULT_TIER, pricing_table
 from .schemas import ExitCostResponse
 
-# Repo root = parents of src/agentdata/api/app.py (app.py -> api -> agentdata ->
-# src -> repo root). The discovery artifacts (llms.txt) live at the repo root.
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_LLMS_TXT = _REPO_ROOT / "llms.txt"
-_API_DOCS = _REPO_ROOT / "docs" / "api.md"
+# Discovery artifacts (llms.txt, docs/api.md) live at the repo root. We resolve
+# them across candidate bases so they're served whether the package is installed
+# editable (src tree intact, __file__ -> repo root) or non-editable into
+# site-packages (where __file__ is NOT under the repo, but the runtime CWD is the
+# repo root — e.g. uvicorn on Render). Robust to both install modes.
+_SRC_ROOT_GUESS = Path(__file__).resolve().parents[3]
+
+
+def _find_artifact(relpath: str) -> Path | None:
+    for base in (_SRC_ROOT_GUESS, Path.cwd()):
+        candidate = base / relpath
+        if candidate.is_file():
+            return candidate
+    return None
 
 app = FastAPI(
     title="AgentData — Executable Liquidity / Exit-Cost",
@@ -93,9 +102,10 @@ def llms_txt() -> str:
     service (CLAUDE.md §10). It is the file shipped at the repo root, served verbatim
     — single source, no duplication. 404 (not 500) if the artifact is missing.
     """
-    if not _LLMS_TXT.is_file():
+    path = _find_artifact("llms.txt")
+    if path is None:
         raise HTTPException(status_code=404, detail="llms.txt not available")
-    return _LLMS_TXT.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8")
 
 
 @app.get("/docs/api.md", response_class=PlainTextResponse, tags=["discovery"])
@@ -106,9 +116,10 @@ def api_docs_md() -> str:
     is an agent that doesn't pick us. Served verbatim from the repo's ``docs/api.md``
     (single source). Distinct from FastAPI's Swagger UI at ``/docs``.
     """
-    if not _API_DOCS.is_file():
+    path = _find_artifact("docs/api.md")
+    if path is None:
         raise HTTPException(status_code=404, detail="api.md not available")
-    return _API_DOCS.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8")
 
 
 @app.get("/v1/liquidity/exit-cost", response_model=ExitCostResponse, tags=["liquidity"])

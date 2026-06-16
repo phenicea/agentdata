@@ -757,3 +757,12 @@ https://github.com/0xcssh/agentdata (branche master). `remotes[0].url` reste pla
 - **Scope npm `@phenicea`** (seulement si/quand on veut publier npm) : création compte/scope = fondateur. Non urgent, hors chemin critique.
 - **P3 (wallet Base Sepolia financé)** : inchangé → E2E testnet → listing #2 Bazaar.
 - **Inchangé** : plan payant (si free tier ne tient pas 3 j), domaine custom (marque `com.phenicea`/`ai.phenicea`), mainnet/vrai USDC → tous escalade humain. Mainnet verrouillé (double garde).
+
+## 2026-06-16 — BUILD — Migration namespace → io.github.phenicea (org créée)
+
+Le fondateur a créé l'org GitHub `phenicea` ; l'agent y est admin. Décision CEO (A1+T) exécutée :
+- Repo **transféré** `0xcssh/agentdata` → **`phenicea/agentdata`** (public, historique préservé, redirection auto active).
+- Namespace re-figé partout en **`io.github.phenicea/agentdata-liquidity-exit-cost`** (server.json, package.json
+  name `@phenicea/...` + mcpName, test_deploy, contact OpenAPI ; grep `0xcssh` vide hors journal). remote git mis à jour.
+- 103 tests verts, commit + push sur phenicea. `remotes[0].url` toujours placeholder Render.
+- Plus aucune migration de namespace à prévoir : publication future directement sous phenicea (un seul listing).
