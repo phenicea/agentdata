@@ -18,7 +18,9 @@ from agentdata.chain import TokenNotFound, get_provider
 from agentdata.compute.tiers import Tier, compute_tier
 from agentdata.config import load_settings
 from agentdata.monitoring import METRICS
+from agentdata.monitoring.dashboard import router as dashboard_router
 from agentdata.safety import guard_network
+from agentdata.web import landing_router
 
 from .pricing import DEFAULT_TIER, pricing_table_for_settings
 from .schemas import ExitCostResponse
@@ -44,8 +46,10 @@ app = FastAPI(
     description=(
         "Pay-per-call data service for AI agents: size-aware **exit cost**, "
         "**depeg risk**, and liquidity **fragility** for a token on Base. Computed "
-        "deterministically from on-chain AMM state (Aerodrome + Uniswap v3), so the "
-        "result is reproducible and redistributable — not a raw price feed.\n\n"
+        "deterministically from on-chain AMM reserves (Aerodrome volatile & stable "
+        "curves; Uniswap v3 via QuoterV2 is a planned extension) and verified against "
+        "the pools' own on-chain getAmountOut — reproducible and redistributable, not "
+        "a raw price feed.\n\n"
         "Three tiers by compute depth (default `risk`): `quote`, `risk`, `deep`. "
         "Pricing is machine-readable at `/pricing` (single source of truth) and "
         "replicated into the MCP tool schema and `llms.txt`.\n\n"
@@ -203,6 +207,14 @@ def _maybe_mount_x402(application: FastAPI) -> None:
     from agentdata.payment import build_x402_middleware
 
     build_x402_middleware(application, settings)
+
+
+# Human/eyeball surfaces (machine path stays /metrics JSON and the discovery
+# artifacts): GET /dashboard (HTML metrics view) and GET / (landing page). These
+# routers are self-contained (they import no app state) and add no payable route, so
+# the /v1/liquidity/exit-cost contract and the testnet/$0 defaults are unaffected.
+app.include_router(dashboard_router)
+app.include_router(landing_router)
 
 
 # ADR-001 §4 guardrail: refuse to start on mainnet without explicit authorization,

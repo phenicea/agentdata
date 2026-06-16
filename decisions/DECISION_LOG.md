@@ -1110,3 +1110,130 @@ Vérifié sur docs.x402.org/extensions/bazaar :
 
 **Statut listing #2 :** prêt à préparer (extension bazaar codable derrière X402_ENABLED, inactive sur listing #1) ;
 activation après le feu vert du listing #1 (chemin critique = 3 j uptime + publish MCP Registry).
+
+## 2026-06-16 — CEO — Listing #2 (Bazaar) : ATTENDRE x402.org (Option A), ZÉRO engagement CDP
+
+> **Fait vérifié en live (ce jour) :** `GET https://x402.org/facilitator/discovery/resources`
+> renvoie toujours `308 → 404` (page HTML « This page could not be found »), idem
+> `https://x402.org/discovery/resources`. Le catalogue de découverte Bazaar n'est PAS servi par le
+> facilitator x402.org testnet aujourd'hui (« Bazaar in early development », cf. CTO doc live du 16/06).
+> Notre côté est prêt : extension déclarative `extensions.bazaar.info` codée derrière `X402_ENABLED`,
+> E2E 402→pay→serve validé testnet, `scripts/check_bazaar_discovery.py` en place (exit code 3 = endpoint
+> non servi = attendu). Le SEUL maillon manquant est externe : le facilitator ne publie pas encore le catalogue.
+
+**Décision : (A) ATTENDRE que x402.org expose `/discovery/resources`. (B) évaluer/utiliser le facilitator
+CDP = REJETÉE maintenant. Hybride limité au seul monitoring, voir ci-dessous.**
+
+- **On NE déploie PAS la 2e instance maintenant.** L'instance dédiée 402/Bazaar (`agentdata-pay`, option A de
+  l'entrée « Topologie Bazaar ») ne sert à rien tant qu'aucun facilitator n'indexe le catalogue : un endpoint
+  public renvoyant un 402 sans catalogue qui le référence = surface opérée pour zéro découvrabilité. Le code
+  (extension déclarative + `render-bazaar.yaml`) reste **prêt à déployer le moment venu** ; le déclencheur de
+  déploiement = « x402.org sert `/discovery/resources` en JSON » (ou un autre facilitator non-custodial le sert).
+- **On N'ENGAGE RIEN côté CDP (Coinbase) pour l'instant — confirmé.** Pas de compte CDP créé, pas de clé/API CDP,
+  pas de bascule de facilitator vers CDP, aucune dépense, aucun KYC. Raison : (1) la valeur non négociable du
+  projet est **non-custodial + pas de dépense + testnet d'abord** (def CEO, CLAUDE.md §8/§14) ; un facilitator
+  CDP peut impliquer un compte Coinbase Developer Platform / une custody / des conditions à vérifier — on ne
+  s'engage pas dans cette dépendance pour un listing #2 dont le North Star dit qu'il est secondaire au stade
+  actuel. (2) Le bénéfice est faible et incertain : même si CDP servait déjà le catalogue Bazaar, le volume de
+  découverte Bazaar aujourd'hui est marginal vs le listing #1 (MCP Registry), qui est le chemin critique.
+  (3) Changer de facilitator nous ferait diverger du facilitator testnet déjà validé E2E (x402.org) sans gain
+  proportionné. → **CDP = porte fermée pour l'instant ; sa réévaluation est elle-même une décision CEO séparée,
+  et toute étape qui impliquerait un compte/custody/coût = escalade humain.**
+- **Hybride retenu (le seul) : surveillance passive.** On garde `scripts/check_bazaar_discovery.py` et on
+  surveille périodiquement l'endpoint. La seule « ouverture » vers CDP autorisée sans engagement est une
+  **vérification en lecture seule** : pointer le script sur un éventuel facilitator CDP public
+  (`--facilitator <url>`) pour CONSTATER s'il sert le catalogue — un simple HTTP GET, sans compte, sans clé,
+  sans paiement. Cela INFORME une future décision, ça n'engage rien. Si un jour un facilitator non-custodial
+  (x402.org OU autre) sert le catalogue sans compte/KYC/coût, on rouvre le dossier topologie.
+
+**Pourquoi (lié au North Star) :**
+- North Star des premiers mois (CLAUDE.md §4) = **fiabilité + découvrabilité + positionnement**, marché petit,
+  **ne pas se disperser**. Le chemin critique aujourd'hui est le **listing #1 (MCP Registry, publish ~19 juin)**
+  dont le compteur 3 j d'uptime court en temps réel — c'est l'actif qu'on ne peut pas rattraper. Le Bazaar est
+  bloqué par une dépendance **externe** qu'aucune action de notre part ne débloque (le facilitator ne sert pas
+  le catalogue). Dépenser de l'attention (et a fortiori s'engager sur CDP) pour contourner un blocage externe à
+  faible enjeu = exactement la dispersion que le North Star proscrit.
+- « Sois partout » (CLAUDE.md §9) reste vrai, mais « partout » se construit **quand chaque canal est joignable**,
+  pas en forçant un canal mort. Notre coût marginal pour être sur le Bazaar le jour J est **quasi nul** (déployer
+  une 2e instance gratuite à partir de code déjà écrit) — donc attendre ne coûte rien et ne nous fait rien perdre.
+- Valeurs : rester sur le facilitator non-custodial déjà validé (x402.org testnet) > prendre une dépendance
+  custody/compte (CDP) pour un gain marginal. Cohérent avec « non-custodial, pas de dépense, testnet d'abord ».
+
+**Hypothèses & risques :**
+- Hypothèse : x402.org finira par exposer `/discovery/resources` (Bazaar « in early development » → publié à terme).
+  Risque : délai inconnu, possiblement long. Mitigation : la surveillance périodique nous fait basculer en mode
+  « déployer » dès que c'est dispo, sans avoir mobilisé d'effort entre-temps ; et le listing #1 (le canal à effet
+  concret aujourd'hui) avance indépendamment.
+- Risque : un concurrent se référence sur le Bazaar avant nous via CDP. Faible enjeu au volume actuel ; et notre
+  positionnement (schéma propre, prix/latence/fiabilité) prime sur l'ordre d'arrivée dans un catalogue naissant.
+  Si la surveillance révèle que CDP sert le catalogue ET que des services data s'y listent réellement, on rouvre
+  la décision (réévaluation CDP = entrée CEO séparée + vérif compte/KYC/coût avant tout engagement).
+- Risque : oublier de surveiller → on rate la fenêtre d'ouverture. Mitigé par la cadence ci-dessous (légère,
+  soutenable) et par le fait que le script est déjà prêt et scriptable.
+
+**Cadence de surveillance de `/discovery/resources` :**
+- **Hebdomadaire** tant que l'endpoint renvoie 404 (exit code 3). Une fois/semaine = suffisant pour un endpoint
+  « in early development » sans changement annoncé ; ne consomme aucune attention. Run :
+  `python scripts/check_bazaar_discovery.py --json` (et, opportunément, contre un facilitator CDP public en
+  lecture seule si une URL est connue : `--facilitator <cdp_url>`).
+- **Resserrement à immédiat** dès tout signal externe (annonce x402.org/Bazaar GA, changelog, mention que
+  `/discovery/resources` est servi) → re-check sur-le-champ et, si le catalogue répond en JSON (exit code 0 ou 2),
+  bascule en mode déploiement (voir « listing #2 done » ci-dessous).
+- Réévaluation de la cadence si toujours 404 après ~6-8 semaines : reconfirmer en doc live que le mécanisme
+  d'enregistrement n'a pas changé (CLAUDE.md §0, ne pas deviner) — le script teste la dispo, pas le protocole.
+
+**Critère « listing #2 (Bazaar) done » :**
+1. Un facilitator **non-custodial** (x402.org en priorité ; sinon un autre **sans compte/KYC/coût** — sinon
+   escalade) sert `/discovery/resources` en JSON ;
+2. notre 2e instance (`agentdata-pay`, testnet, `X402_ENABLED=true`, `PAY_TO_ADDRESS=0x5E44…`) est déployée et
+   renvoie publiquement un **402 bien formé** sur `/v1/liquidity/exit-cost`, avec l'extension `bazaar` déclarée ;
+3. `scripts/check_bazaar_discovery.py` retourne **exit code 0 (FOUND)** : notre ressource apparaît dans le
+   catalogue via `/discovery/resources` (matchée par nom OU URL) ;
+4. le tout **sans jamais** avoir fait quitter à l'instance #1 son état `payments-OFF` (listing #1 protégé).
+Tant que (1) est faux, listing #2 = « bloqué externe, prêt côté nous » — état acceptable et explicitement non
+sur le chemin critique.
+
+**Confirmation explicite (Option A) : ZÉRO engagement côté CDP à ce stade.** Aucun compte CDP, aucune clé, aucun
+KYC, aucune dépense, aucune bascule de facilitator. La seule interaction tolérée avec CDP est un GET de lecture
+seule à fin de constat via le script de surveillance. Toute utilisation réelle de CDP = décision CEO séparée +
+escalade humain si elle implique compte/custody/coût.
+
+**Succès mesuré par :**
+- Listing #1 reste sur le chemin critique, non perturbé (publish MCP Registry ~19 juin atteint).
+- Surveillance Bazaar effective : check hebdo loggé ; bascule immédiate prévue si l'endpoint s'ouvre.
+- Aucun artefact CDP créé (vérifiable : pas de compte/clé/config CDP dans le repo ni côté fondateur).
+- Le jour où `/discovery/resources` est servi : critère « listing #2 done » (1→4) atteint au coût marginal
+  d'un déploiement free-tier déjà préparé.
+
+**Handoff :**
+- **cto-agent :** RIEN à activer maintenant. Garder l'extension bazaar derrière `X402_ENABLED` (inactive sur
+  l'instance #1) et `render-bazaar.yaml` prêts. Exécuter la **surveillance hebdomadaire**
+  `python scripts/check_bazaar_discovery.py --json` (consigner brièvement le résultat ; pas besoin d'une entrée
+  par run tant que c'est « 404/exit 3 »). Si un facilitator CDP public est connu, un GET lecture seule
+  `--facilitator <url>` est autorisé pour CONSTAT uniquement (aucun compte/clé). Dès qu'un facilitator
+  non-custodial sert le catalogue en JSON → remonter au CEO pour déclencher le déploiement de la 2e instance.
+  Ne PAS s'engager côté CDP, ne PAS toucher l'instance #1, mainnet verrouillé.
+- **Fondateur :** aucune action requise pour le Bazaar maintenant. Continuer à protéger le listing #1
+  (instance #1 payments-OFF, 3 j uptime → publish ~19 juin). La 2e instance Render ne sera demandée que le jour
+  où l'endpoint de découverte s'ouvre (action de compte gratuite, free tier ; toute CB/plan payant = escalade).
+  Ne créer AUCUN compte CDP/Coinbase Developer Platform pour ce projet sans décision CEO préalable.
+
+## 2026-06-16 — MILESTONE — Math AMM PROUVÉE contre l'oracle on-chain réel (+ finding bloquant résolu)
+
+Audit sécurité du pipeline « parallel-hardening » a trouvé 1 bloquant (high) : la vérif AMM-vs-onchain était
+**tautologique** (le « ground truth » recopiait la formule de amm.py) et **ne couvrait pas v3**.
+
+**Corrigé :** `scripts/verify_amm_onchain.py` + `tests/test_amm_onchain.py` réécrits pour comparer amm.py au
+**`getAmountOut` réel des pools Aerodrome déployés** (oracle indépendant = code du contrat on-chain), en lecture seule
+(RPC public Base, aucun fonds). Adresses vérifiées en eth_call (pas devinées) :
+- Volatile WETH/USDC `0xcDAC…C43` (fee 30 bps) → **0,0000 bps** d'écart sur 0.1/1/10/100 WETH.
+- Stable USDC/USDbC `0x27a8…B2bD` (fee 5 bps, courbe Solidly x³y+xy³ = notre code non trivial) → **0,0000 bps**.
+worst deviation = 0,0000 bps → PASS. L'exactitude (argument de vente) est donc **prouvée empiriquement**.
+
+**Scope honnête (finding v3) :** amm.py n'implémente que VOLATILE + STABLE. v3/CL n'a pas de formule fermée → serait
+sourcé via QuoterV2 (extension planifiée, NON implémentée). Description OpenAPI corrigée pour ne plus survendre v3.
+
+**Autres livrables du pipeline (commités) :** PaymentRail (`payment/rail.py` interface + X402Rail délégation) +
+`NOTES_RAILS.md` ; tests edge/erreurs + `chain/onchain.py` durci (ChainError clair sur RPC down/pool vide) ;
+dashboard `/dashboard` + `monitoring/logging_setup.py` ; landing `/` ; runbooks `docs/publish-mcp-registry.md` +
+`docs/publish-npm.md`. **175 tests verts** (vérif on-chain incluse), listing #1 intact (X402 off, $0, schéma inchangé).
