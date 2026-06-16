@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.0xcssh/agentdata-liquidity-exit-cost",
+  "name": "io.github.phenicea/agentdata-liquidity-exit-cost",
   "title": "AgentData - Executable Liquidity / Exit-Cost",
   "description": "Size-aware exit cost, depeg risk, and liquidity fragility for a token on Base. Deterministic on-chain AMM math (Aerodrome + Uniswap v3). Testnet / preview.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/0xcssh/agentdata",
+  "websiteUrl": "https://github.com/phenicea/agentdata",
   "repository": {
-    "url": "https://github.com/0xcssh/agentdata",
+    "url": "https://github.com/phenicea/agentdata",
     "source": "github"
   },
   "remotes": [

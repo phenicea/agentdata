@@ -46,7 +46,7 @@ app = FastAPI(
     ),
     contact={
         "name": "AgentData — Executable Liquidity",
-        "url": "https://github.com/0xcssh/agentdata",
+        "url": "https://github.com/phenicea/agentdata",
     },
     license_info={"name": "MIT"},
     openapi_tags=[

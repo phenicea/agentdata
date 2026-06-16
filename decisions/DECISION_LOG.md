@@ -653,3 +653,107 @@ E2E testnet (option C) attend le wallet Base Sepolia financé. Mainnet toujours 
 - **P2 (org GitHub `phenicea` + scope npm `@phenicea`)** : création web only → action humaine. Non bloquant pour le push 0xcssh ni pour l'uptime.
 - **P3 (wallet Base Sepolia financé)** : inchangé → débloque E2E testnet → listing #2 Bazaar.
 - **Inchangé** : plan payant (si free tier ne tient pas 3 j), domaine custom (marque), mainnet/vrai USDC → tous escalade humain. Mainnet verrouillé (double garde).
+
+## 2026-06-16 — BUILD — Repo poussé sur GitHub (interim namespace 0xcssh)
+
+**Fait par l'agent (dans son mandat, zéro argent) :** application de la décision CEO (Option A). Namespace re-figé
+`io.github.0xcssh/agentdata-liquidity-exit-cost` (server.json + package.json mcpName + test_deploy + contact OpenAPI),
+103 tests verts, scan secrets négatif, repo git init + 2 commits, **repo PUBLIC créé et poussé** :
+https://github.com/0xcssh/agentdata (branche master). `remotes[0].url` reste placeholder Render.
+
+**Ne PEUT PAS être fait par l'agent (compte/identité/temps réel) — escalades humaines :**
+- P1 **Render** : déployer (compte fondateur) → Blueprint lit render.yaml → fournir l'URL. Pour le listing #1,
+  X402_ENABLED=false → aucun secret requis (PAY_TO_ADDRESS vide ok, facilitator testnet par défaut).
+- P2 **org GitHub `phenicea`** + scope npm `@phenicea` (migration de marque, non bloquante).
+- P3 **wallet Base Sepolia financé** (E2E testnet → listing #2 Bazaar).
+- Création d'org GitHub = web only (token a read:org, pas admin:org) ; pas de CLI Render ; 3 j uptime = temps réel.
+
+**Reste agent après P1 :** remplacer le placeholder par l'URL Render dans server.json/OpenAPI/llms.txt, keep-alive
+/health, puis (après 3 j uptime) préparer `mcp-publisher`. Mainnet toujours verrouillé.
+
+## 2026-06-16 — CEO — Migration vers Phenicea MAINTENANT (org créée avant tout déploiement) — supersède le point « namespace intérimaire 0xcssh » de l'Option A
+
+> **Supersession explicite.** Cette décision **supersède le point namespace** de l'entrée « Option A » du
+> 16/06 (« 2026-06-16 — CEO — Repo/namespace : pousser MAINTENANT sous 0xcssh »). Le namespace intérimaire
+> `io.github.0xcssh/...` était conditionné à « TANT QUE l'org phenicea n'existe pas ». **Fait nouveau :
+> l'org `phenicea` existe, l'agent (compte 0xcssh) y est admin.** La condition de l'intérim tombe → on
+> exécute la migration prévue par l'Option A elle-même (qui désignait Phenicea comme cible et la migration
+> comme « config + re-listing, pas une réécriture »). Tout le reste de l'Option A (repo public, escalades,
+> ordre P1/P3) **reste en vigueur**.
+
+**Décision :**
+
+**1. A1 — MIGRER MAINTENANT vers `io.github.phenicea/...`. (Recommandé. A2 = rester sous 0xcssh : REJETÉE.)**
+- On re-fige le namespace de marque **maintenant**, parce que la fenêtre est idéale : l'org est prête
+  **AVANT** tout déploiement Render, tout uptime, et toute publication registre. C'est le moment où la
+  migration coûte **le strict minimum absolu** :
+  - **aucune entrée registre à superséder** (rien n'est encore publié via `mcp-publisher`) → zéro double-listing, zéro churn de namespace visible ;
+  - **aucun uptime à redémarrer** (le compteur 3 j n'a pas commencé : Render n'est pas déployé) → on ne perd pas un seul jour d'historique ;
+  - **aucune URL Render live à repointer** (`remotes[0].url` est encore un placeholder).
+- Migrer plus tard (après déploiement/uptime/publish) coûterait au contraire : re-listing registre + churn visible + risque de repointer une URL en prod. **Donc migrer maintenant élimine toute migration future** et donne la marque dès le jour 1. C'est l'arbitrage que l'Option A appelait elle-même de ses vœux (« migrer AVANT le publish si l'org arrive à temps ») — l'org est arrivée à temps, et même bien plus tôt qu'espéré.
+- **A2 rejetée** : rester sous 0xcssh n'a de sens QUE comme intérim pour ne pas bloquer l'uptime. Or rien n'est bloqué par la migration ici (elle est plus rapide que d'attendre le déploiement). Garder 0xcssh maintenant ne ferait que **garantir** une migration future plus coûteuse, sans aucun bénéfice. C'est le mauvais côté de l'arbitrage.
+
+**2. Méthode = T (TRANSFÉRER le repo `0xcssh/agentdata` → `phenicea/agentdata`). (Recommandé. F = repo neuf : REJETÉE.)**
+- **`gh repo transfer 0xcssh/agentdata --new-owner phenicea`** (l'agent est admin sur l'org → faisable sans escalade). Le transfert GitHub : (a) **préserve l'historique** des 2 commits ; (b) crée une **redirection automatique** `0xcssh/agentdata → phenicea/agentdata` (les anciens liens ne meurent pas — important car `repository.url` a pu être vu/indexé) ; (c) ne laisse **pas de doublon** sous 0xcssh.
+- Ensuite : re-figer le namespace en `io.github.phenicea/...` dans `server.json` + `package.json` (+ tout autre fichier référençant 0xcssh : `test_deploy`, contact OpenAPI, liens llms.txt/docs), mettre à jour le **remote git local** (`git remote set-url origin https://github.com/phenicea/agentdata.git`), commit + push.
+- **F (repo neuf + re-push) rejetée** : plus « simple » en apparence mais (i) **pas de redirection** → les liens 0xcssh deviennent morts ou trompeurs ; (ii) **laisse `0xcssh/agentdata` en doublon public** (deux repos du même projet = bruit, ambiguïté pour un agent/humain qui évalue, anti-lisibilité — contraire à CLAUDE.md §10) ; (iii) perd la continuité d'historique. Le transfert est strictement supérieur ici et tout aussi gratuit/réversible.
+- Garde-fou : avant transfert, re-confirmer qu'aucun secret n'est dans l'historique (déjà scanné négatif à l'entrée « Repo poussé », mais le push de migration touche au public → re-vérifier le HEAD au moins). Vérifier aussi que le nom `phenicea/agentdata` est libre (l'org est neuve, donc oui sauf collision improbable).
+
+**3. npm `@phenicea` — RÉSERVER MAINTENANT (publication = plus tard, non bloquante).**
+- **Réserver le scope/nom maintenant** : c'est gratuit, ça verrouille la marque sur npm avant un éventuel squat, et ça s'aligne sur le re-fige du `package.json` qu'on fait de toute façon dans cette migration (coût marginal nul). Concrètement : renommer `package.json` en `@phenicea/agentdata-liquidity-exit-cost` (cohérence de marque), garder `private:false`.
+- **Mais ne PAS mettre la publication npm sur le chemin critique** : rappel confirmé en doc live (entrée « Namespace Phenicea » du 16/06) — un serveur **remote** (`remotes[].type=streamable-http`) se liste au MCP Registry **avec une simple URL, sans package npm publié**. Le listing #1 = `server.json` remote + `mcp-publisher publish`. npm ne sert qu'à une install stdio locale qu'on n'offre pas.
+- **Sur la réservation effective du nom sur npm** : `npm publish` réel sous `@phenicea` exige un compte npm + une org/scope npm créée par le fondateur. Si ce n'est pas déjà fait → **micro-escalade (compte, pas argent)** : créer le scope npm `@phenicea`. Tant que ce n'est pas fait, on fige juste le **nom** dans `package.json` (réservation « intention de marque » dans le code) sans publier. Publier le placeholder npm peut se faire plus tard, hors chemin critique. **Recommandation : réserver le nom dans le manifest maintenant, créer le scope npm quand le fondateur passe (non urgent), publier seulement si/quand utile.**
+
+**Pourquoi :**
+- **La fenêtre actuelle rend la migration gratuite et définitive.** L'Option A avait raison de ne pas attendre l'org pour faire courir l'uptime — mais l'org est arrivée **avant** que l'uptime ne démarre. Donc l'unique justification de l'intérim (ne pas perdre de temps d'historique) ne s'applique plus : migrer maintenant ne coûte aucun jour d'uptime. On capture le bénéfice de marque dès le jour 1 **sans payer le coût** que l'intérim était censé éviter.
+- **Cohérence avec le North Star (CLAUDE.md §4, §3 def CEO)** : le namespace n'est pas un critère mécanique de sélection (prix/latence/fiabilité/schéma le sont). Donc on ne se précipite PAS pour la marque au détriment de l'uptime — ici il n'y a pas d'arbitrage, les deux vont dans le même sens : migrer maintenant ne retarde rien et supprime un futur churn de namespace (qui, lui, *pourrait* être lu comme un signal d'instabilité).
+- **Pleinement dans le mandat CEO** : transfert de repo + re-fige de namespace + réservation de nom = gratuit, testnet, réversible, distribution/marque = mon domaine. Aucune dépense, aucun mainnet, aucun vrai USDC. L'admin sur l'org rend le transfert exécutable par l'agent sans escalade (≠ création d'org, qui exigeait le fondateur).
+
+**Hypothèses & risques :**
+- Hypothèse : `gh repo transfer` vers une org où l'agent est admin réussit sans intervention humaine (admin org = droit de recevoir un transfert + créer des repos). Si GitHub exige une acceptation côté org / un scope `admin:org` que le token n'a pas → **fallback escalade légère** : le fondateur clique « accept transfer » (ou fait le transfert depuis l'UI), puis l'agent reprend le re-fige namespace. Ne PAS basculer vers F (repo neuf) pour contourner — ça perd la redirection ; préférer l'acceptation humaine du transfert.
+- Risque : le scope npm `@phenicea` n'est pas encore créé → on ne peut que figer le nom dans le manifest, pas publier. Acceptable (npm hors chemin critique). Documenté comme micro-escalade compte.
+- Risque : références résiduelles à `0xcssh` ailleurs que les 2 manifests (tests, OpenAPI contact, liens llms.txt/docs) → un grep exhaustif `0xcssh` doit revenir vide après migration, sinon URLs incohérentes. À vérifier (cf. Handoff).
+- Risque : la redirection GitHub se casse si quelqu'un recrée plus tard un repo `0xcssh/agentdata`. Faible (compte perso du fondateur, pas de raison de recréer). Acceptable.
+- Inchangé : tout le reste de l'Option A tient (repo public = crédibilité, garde-fous mainnet doubles, P1 Render = vrai goulot de l'uptime, P3 wallet = listing #2).
+
+**Succès mesuré par :**
+- `phenicea/agentdata` existe, public, historique préservé, **redirection `0xcssh/agentdata` → `phenicea/agentdata` active** (l'ancien lien résout en 200/redirige), **pas de doublon** `0xcssh/agentdata` laissé tel quel.
+- `server.json.name` === `package.json.mcpName` === **`io.github.phenicea/agentdata-liquidity-exit-cost`** ; `grep -ri 0xcssh` sur le repo = **vide** (plus aucune URL/namespace 0xcssh) ; `repository.url`/`websiteUrl` → `github.com/phenicea/agentdata` résolvent en 200 ; `remote origin` local pointe sur phenicea ; 103 tests toujours verts.
+- npm : nom figé `@phenicea/agentdata-liquidity-exit-cost` dans `package.json` (réservation de marque). Publication npm = optionnelle, hors chemin critique.
+- **Conséquence durable : plus AUCUNE migration de namespace à prévoir.** Quand le gate 3 j uptime tombera (après déploiement Render), on publie directement sous phenicea — un seul listing, aucun supersede.
+
+**Handoff :** voir bloc Handoff CTO ci-dessous.
+
+## 2026-06-16 — CEO — Handoff consolidé → cto-agent (migration 0xcssh → phenicea, exécutable maintenant)
+
+À traiter par `cto-agent` (le « comment »). **Aucune touche mainnet, aucune dépense, tout réversible. L'agent est admin sur l'org `phenicea` → le transfert est dans le mandat (pas d'escalade), sauf si GitHub exige une acceptation côté org (fallback humain ci-dessous).**
+
+**A. Pré-migration (avant le transfert) :**
+1. Re-confirmer **aucun secret** au HEAD (et idéalement historique) : pas de `.env` réel, pas de `PAY_TO_ADDRESS`/`FACILITATOR_URL` non-placeholder, pas de clé wallet. (Scan déjà négatif à l'entrée « Repo poussé » — re-vérifier le HEAD au minimum avant un push public de migration.)
+2. Confirmer que le nom `phenicea/agentdata` est **libre** dans l'org (org neuve → normalement oui).
+
+**B. Transférer le repo (méthode T) :**
+3. `gh repo transfer 0xcssh/agentdata --new-owner phenicea` (ou équivalent API). Vérifier que la **redirection automatique** `0xcssh/agentdata → phenicea/agentdata` est active (cliquer l'ancien lien doit rediriger).
+4. **Si GitHub bloque** (acceptation requise côté org / scope `admin:org` manquant) → **escalade légère** : demander au fondateur d'**accepter le transfert** dans l'UI GitHub (ou de le lancer depuis l'UI). **NE PAS** créer un repo neuf à la place (F) — on tient à la redirection + zéro doublon.
+5. Mettre à jour le **remote git local** : `git remote set-url origin https://github.com/phenicea/agentdata.git`.
+
+**C. Re-figer le namespace en `phenicea` (dans le code) :**
+6. `server.json` : `name` → `io.github.phenicea/agentdata-liquidity-exit-cost` ; `websiteUrl` et `repository.url` → `https://github.com/phenicea/agentdata`. **NE PAS toucher** `remotes[0].url` (reste `PLACEHOLDER-RENDER-HOST` jusqu'au déploiement Render — étape humaine P1).
+7. `package.json` : `name` → `@phenicea/agentdata-liquidity-exit-cost` ; `mcpName` → `io.github.phenicea/agentdata-liquidity-exit-cost` (DOIT être identique à `server.json.name`) ; `repository.url`, `homepage`, `bugs.url` → `phenicea`.
+8. Vérifier l'invariant registre : `server.json.name` === `package.json.mcpName`.
+9. **Grep exhaustif `0xcssh`** sur tout le repo (code, tests, OpenAPI contact, llms.txt, docs/api.md, README) → remplacer **toutes** les occurrences résiduelles par `phenicea`. Le grep final doit revenir **vide**. (L'entrée « Repo poussé » mentionne test_deploy + contact OpenAPI parmi les fichiers touchés au moment du fige 0xcssh — les re-cibler.)
+10. Re-lancer la suite : **103 tests doivent rester verts** ; schéma API inchangé ; garde-fous mainnet intacts (NETWORK_MODE=testnet défaut, ALLOW_MAINNET absent, X402_ENABLED=false défaut).
+11. Commit (« migrate namespace 0xcssh → phenicea ») + push sur `phenicea/agentdata`.
+
+**D. npm (réservation de marque, hors chemin critique) :**
+12. Garder le nom `@phenicea/agentdata-liquidity-exit-cost` figé dans `package.json` (fait en C7). **Ne PAS** `npm publish` maintenant (listing #1 = remote URL, npm non requis). Publication npm = optionnelle ultérieure, sous le scope `@phenicea` (création du scope npm = micro-escalade compte fondateur, non urgente).
+
+**E. Après déploiement Render (étape humaine P1) — inchangé :**
+13. URL Render connue → `remotes[0].url` = `https://<render-host>/mcp` ; OpenAPI `servers[]` + liens absolus `llms.txt` → host public ; rejouer le test discovery (tous liens 200) ; keep-alive `/health` (~10 min). Puis 3 j uptime → `mcp-publisher login github` (org `phenicea`) + `publish` (libellé testnet/preview). **Plus aucun arbitrage de timing de namespace** : on publie directement sous phenicea, un seul listing.
+
+**F. Escalades humaines (ne PAS décider côté agents) :**
+- **P1 (déploiement Render)** : compte fondateur requis → action humaine. Reste le **vrai goulot** qui fait courir l'uptime. Inchangé, prioritaire.
+- **Acceptation transfert GitHub** (seulement si le transfert auto échoue, B4) : clic fondateur dans l'UI. Léger.
+- **Scope npm `@phenicea`** (seulement si/quand on veut publier npm) : création compte/scope = fondateur. Non urgent, hors chemin critique.
+- **P3 (wallet Base Sepolia financé)** : inchangé → E2E testnet → listing #2 Bazaar.
+- **Inchangé** : plan payant (si free tier ne tient pas 3 j), domaine custom (marque `com.phenicea`/`ai.phenicea`), mainnet/vrai USDC → tous escalade humain. Mainnet verrouillé (double garde).

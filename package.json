@@ -1,8 +1,8 @@
 {
-  "name": "@0xcssh/agentdata-liquidity-exit-cost",
+  "name": "@phenicea/agentdata-liquidity-exit-cost",
   "version": "0.1.0",
   "description": "MCP server metadata for AgentData - size-aware exit cost, depeg risk, and liquidity fragility for a token on Base. Remote streamable-http server (Python/FastMCP). Testnet / preview. NOT for real publishing here.",
-  "mcpName": "io.github.0xcssh/agentdata-liquidity-exit-cost",
+  "mcpName": "io.github.phenicea/agentdata-liquidity-exit-cost",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -17,11 +17,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/0xcssh/agentdata.git"
+    "url": "https://github.com/phenicea/agentdata.git"
   },
-  "homepage": "https://github.com/0xcssh/agentdata#readme",
+  "homepage": "https://github.com/phenicea/agentdata#readme",
   "bugs": {
-    "url": "https://github.com/0xcssh/agentdata/issues"
+    "url": "https://github.com/phenicea/agentdata/issues"
   },
   "private": false,
   "publishConfig": {
