@@ -30,7 +30,9 @@ services:
     startCommand: uvicorn agentdata.asgi:app --host 0.0.0.0 --port $PORT
     # Render's free-tier health probe; also the path the external keep-alive pings.
     healthCheckPath: /health
-    autoDeploy: false
+    # Auto-deploy on push to the tracked branch — keeps the live service in sync
+    # without a manual deploy each time. Testnet-locked, so this is safe.
+    autoDeploy: true
     envVars:
       # Testnet locked. ADR-001 §4: ALLOW_MAINNET is deliberately NOT declared, so
       # the app refuses to ever start on mainnet. Do not add it here.
