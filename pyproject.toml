@@ -1,0 +1,31 @@
+[project]
+name = "agentdata"
+version = "0.1.0"
+description = "Executable-liquidity / exit-cost & fragility intelligence endpoint for AI agents (x402, Base)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.7",
+    "uvicorn[standard]>=0.30",
+    "web3>=6.20",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+# MCP SDK for the streamable-http server wrapper (agentdata.mcp / agentdata.asgi).
+# Kept as an extra so the Phase 1/2 REST app installs without it; the deploy image
+# (Dockerfile / render.yaml) installs ".[mcp]" to serve REST + MCP on one port.
+# Pinned per ADR-001 §0 (live introspection: mcp 1.27.2, streamable-http transport).
+mcp = ["mcp>=1.27,<2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

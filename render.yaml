@@ -1,0 +1,55 @@
+# Render blueprint — AgentData endpoint #1 (testnet / preview).
+#
+# One free Web Service = one Python ASGI process on one port ($PORT, injected by
+# Render) serving BOTH the FastAPI REST routes AND the MCP streamable-http
+# endpoint (/mcp), via the combined app `agentdata.asgi:app`.
+#
+# CEO decision (DECISION_LOG 2026-06-16): Render free tier, no card, no spend.
+# Free instances sleep after ~15 min idle; neutralize with an EXTERNAL free
+# keep-alive ping (cron-job.org / UptimeRobot) hitting /health every ~10 min so
+# the 3-day uptime counter (listing #1 trigger) keeps running. Not configured
+# here — set up the external pinger separately and point it at https://<host>/health.
+#
+# Hard rules: testnet only, NO mainnet value active by default, NO secret in repo.
+# Only the PUBLIC PAY_TO_ADDRESS is a runtime env var, entered in the Render
+# dashboard (sync: false) — never committed. No private key, ever.
+#
+# DEPLOYMENT IS A HUMAN STEP. This file is deploy-ready config only.
+
+services:
+  - type: web
+    name: agentdata-liquidity-exit-cost
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    # Editable install of the project + the `mcp` extra (FastMCP / streamable-http)
+    # required by agentdata.asgi. fastapi/uvicorn come from pyproject deps.
+    buildCommand: pip install ".[mcp]"
+    # Single uvicorn process, REST + MCP on the Render-provided $PORT.
+    startCommand: uvicorn agentdata.asgi:app --host 0.0.0.0 --port $PORT
+    # Render's free-tier health probe; also the path the external keep-alive pings.
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Testnet locked. ADR-001 §4: ALLOW_MAINNET is deliberately NOT declared, so
+      # the app refuses to ever start on mainnet. Do not add it here.
+      - key: NETWORK_MODE
+        value: testnet
+      # Deterministic offline pools — no RPC, no upstream secret needed.
+      - key: POOL_SOURCE
+        value: fixture
+      # Listing #1 (MCP Registry) needs no 402. Payments stay off.
+      - key: X402_ENABLED
+        value: "false"
+      # PUBLIC receiving address only. Set in the Render dashboard, NEVER in repo.
+      # sync: false => Render prompts for the value and does not read it from here.
+      # The wallet PRIVATE KEY is never an env var of this kind — it stays in a
+      # secret manager and is not needed at all while X402_ENABLED=false.
+      - key: PAY_TO_ADDRESS
+        sync: false
+      # Optional override of the x402 facilitator. Empty/unset => the testnet
+      # default (https://x402.org/facilitator) is used by the app. Set in the
+      # dashboard only if running a custom facilitator. Never hardcode here.
+      - key: FACILITATOR_URL
+        sync: false

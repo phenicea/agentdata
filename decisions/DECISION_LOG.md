@@ -1,0 +1,581 @@
+# Journal des décisions — AgentData
+
+> Mémoire partagée des deux agents décisionnels (`ceo-agent`, `cto-agent`) et du fondateur.
+> Chaque décision est ajoutée en bas, datée, avec son auteur (CEO / CTO / HUMAIN). Ne pas réécrire une
+> décision passée : si elle change, en ajouter une nouvelle qui supersède l'ancienne (référence-la).
+> Source de vérité du projet : `../CLAUDE.md`.
+
+---
+
+## 2026-06-16 — HUMAIN + Phase 0 — Cadrage validé
+
+**Décision :** Endpoint #1 = sous-niche **« liquidité exécutable / fragilité & coût de sortie »**
+(exit-cost, depeg-risk), positionné sur la fragilité/coût de sortie, **pas** le slippage brut.
+**Pourquoi :** primitive pré-trade à haute fréquence d'appel (idéal modèle % sur volume) ; vrai trou de
+marché (TVL statique partout, exit-cost dynamique size-aware nulle part) ; math AMM déterministe et
+vérifiable = défendable sur l'exactitude ; 100 % sourçable on-chain = droit de redistribution propre ;
+conforme aux valeurs (info de marché, pas de maysir/riba).
+**Succès mesuré par :** endpoint testnet live, schéma JSON stable, latence basse, exactitude vérifiable
+contre un swap simulé.
+**Handoff :** Phase 1 (endpoint local) à lancer après cadrage — non démarrée.
+
+## 2026-06-16 — HUMAIN — Chaîne MVP
+
+**Décision :** **Base d'abord** pour le MVP ; **Solana = endpoint #2**. Projet = track données, multi-chaîne
+(Base + Solana) à terme.
+**Pourquoi :** Base = volume x402 le plus gros + sources on-chain les plus propres (Aerodrome Sugar +
+Uniswap v3) ; MVP le plus rapide et le plus propre.
+
+## 2026-06-16 — HUMAIN — Stack
+
+**Décision :** **Python / FastAPI** pour l'endpoint #1.
+**Pourquoi :** SDK x402 Python confirmé en live (PyPI `x402` v2.x, extras `fastapi`/`svm`/`mcp`) vs incertitude
+sur les versions npm `@x402/*` ; math AMM propre en Python ; pas de raison de forcer TS pour un backend de données.
+
+## 2026-06-16 — HUMAIN — Création des agents décisionnels
+
+**Décision :** Mise en place de `ceo-agent` (décisions business) et `cto-agent` (décisions techniques) comme
+subagents persistants, bornés par les valeurs du `CLAUDE.md`, escaladant au humain tout ce qui touche au
+mainnet / vrai USDC / irréversible.
+**Pourquoi :** déléguer les décisions courantes vers l'objectif 10K/mois tout en gardant l'humain sur les
+décisions argent réel.
+
+## 2026-06-16 — CEO — Pricing endpoint #1 (exit-cost / fragilité de liquidité)
+
+**Décision :**
+- **Prix mainnet cible = tarification par tiers, pas prix unique.** Trois tiers basés sur la complexité de
+  calcul de la requête (le coût marginal réel = lectures RPC + simulation AMM, pas la taille du payload) :
+  - **Tier A — « quote » (lookup simple)** : exit-cost size-aware pour 1 pool/1 size sur Base. **0,008 $/appel.**
+  - **Tier B — « risk » (par défaut, sweet spot)** : exit-cost + depeg-risk + fragilité agrégée multi-pools
+    pour un token/une position. **0,02 $/appel.** C'est le tier vitrine, celui qu'on optimise pour la sélection.
+  - **Tier C — « deep » (multi-size / scénarios de sortie)** : courbe de coût de sortie sur plusieurs tailles
+    (ladder de liquidation) + cross-check interne. **0,04 $/appel.**
+- **Prix testnet = gratuit (0 $)**, flux 402 complet quand même exécuté en monnaie de test (montant symbolique
+  non nul possible en testnet USDC si le facilitator l'exige pour valider la vérification de paiement, mais
+  jamais de vrai USDC). Le testnet sert à valider le flux, pas à monétiser.
+- **Plancher défendu : on ne descend pas sous 0,008 $.** On ne participe pas à la course vers le bas (cf.
+  CLAUDE.md §16 « écartés : x402 moins cher »).
+
+**Pourquoi :**
+- Cible CLAUDE.md §8 respectée : 0,008–0,04 $ est entièrement dans la fenêtre 0,001–0,05 $ et sous le seuil
+  0,10 $ où vivent 76 % des services. On reste sélectionnable.
+- Positionnement vs marché Phase 0 : on se place **délibérément au-dessus de la pure commodité** (x402-api
+  0,001–0,008 $) parce qu'on ne vend PAS une lecture brute revendable — on vend un **calcul AMM déterministe
+  size-aware** que personne ne sert (le trou identifié). Le tier B à 0,02 $ chevauche Sentinel (0,005–0,025 $)
+  et le bas de DeFi Signal Agent (0,01–0,10 $) : crédible, dans la norme « donnée à valeur ajoutée », sans
+  être Intel API (0,50 $) qui est hors-fenêtre pour un agent qui appelle en boucle pré-trade.
+- Tiers plutôt que prix unique : un agent qui veut juste « est-ce que je peux sortir 10k $ de ce pool » ne doit
+  pas payer le prix d'une courbe complète ; et la requête « deep » coûte réellement plus cher à calculer. Le
+  pricing par tier aligne prix et coût marginal, et donne un point d'entrée bas (0,008 $) qui sert d'aimant.
+- Conforme aux valeurs : modèle % sur volume d'appels (§3), pas d'abonnement, primitive pré-trade à haute
+  fréquence — donc même un prix bas accumule du volume.
+
+**Hypothèses & risques :**
+- Hypothèse : le coût amont reste quasi nul (RPC public Base + Sugar/Uniswap v3 on-chain). **Si on doit passer
+  à un RPC/indexeur payant à volume (§14), le plancher 0,008 $ doit être revalidé** → ESCALADE humain (dépense
+  réelle) avant tout engagement RPC payant.
+- Risque : 3 tiers ajoutent de la complexité de découvrabilité — un agent doit comprendre quel tier appeler.
+  Mitigé en exposant le tier B comme route par défaut et les tiers A/C comme paramètres explicites documentés.
+- Risque : prix mainnet réels = exposition USDC. **Le passage mainnet et l'activation du pricing réel sont
+  ESCALADÉS au humain** (CLAUDE.md §0, §14). Ces chiffres sont la cible, pas une autorisation de mainnet.
+- Risque marché : le marché est petit (§4). Le pricing n'est pas le levier de revenu des premiers mois — la
+  découvrabilité l'est. On ne sur-optimise pas le prix maintenant ; on le fige pour pouvoir shipper.
+
+**Succès mesuré par :**
+- Court terme (testnet/positionnement) : tier B est le tier appelé dans **> 60 %** des requêtes (signe que le
+  produit-vitrine est bien le point de valeur), latence p95 du tier B **< 800 ms**.
+- Mainnet (après escalade) : **taux de rachat** (mêmes wallets qui rappellent) > taux de sélection one-shot —
+  c'est le vrai signal qu'on est « choisi », pas juste « listé ». Revenu = métrique secondaire les 3 premiers mois.
+
+**Handoff :** voir bloc Handoff CTO consolidé en fin de ces deux décisions.
+
+## 2026-06-16 — CEO — Ordre & stratégie de listing / distribution
+
+**Décision :** Ordre de listing, avec critère déclencheur explicite par canal :
+
+1. **MCP Registry + npm — EN PREMIER (dès Phase 3, sur testnet).**
+   - Déclencheur : **endpoint testnet live + schéma JSON stable + serveur MCP fonctionnel + 3 jours d'uptime
+     testnet sans régression de schéma.** Pas besoin du flux 402 réglé pour publier ici.
+   - npm est groupé avec MCP : le serveur MCP est publié comme package npm (`server.json` + CLI `mcp-publisher`),
+     donc une seule étape technique couvre les deux. On publie en marquant clairement « testnet / preview ».
+
+2. **x402 Bazaar — EN DEUXIÈME (Phase 4, dès que le flux 402 est validé end-to-end sur testnet).**
+   - Déclencheur : **flux 402 → pay → serve validé de bout en bout sur testnet** (Phase 2 done), endpoint
+     `/discovery/resources` du facilitator répond, extension de route « bazaar » activée et auto-opt-in vérifié.
+   - C'est la couche de découverte machine native du protocole : on doit y être dès qu'on a un 402 qui marche,
+     car c'est le chemin par lequel un agent x402 nous trouve sans intermédiaire.
+
+3. **BlockRun (t.me/bc1max) — EN TROISIÈME, mais c'est le canal à plus fort trafic → on le prépare en parallèle.**
+   - Déclencheur de **contact** : **7 jours d'uptime testnet stable + page de docs markdown + OpenAPI + au moins
+     un flux 402 démontrable.** On ne contacte bc1max qu'avec un produit montrable (ils onboardent chaque semaine,
+     on ne brûle pas le premier contact avec un truc cassé).
+   - Déclencheur de **listing actif sur trafic réel** : BlockRun route du volume mainnet → **le listing BlockRun
+     pleinement actif (trafic payant réel) est conditionné au passage mainnet → ESCALADE humain.** On peut être
+     référencé/préparé avant, mais l'exposition au vrai USDC via leur gateway = décision humain.
+
+**Pourquoi :**
+- Principe CLAUDE.md §9 « sois partout », mais l'ordre suit le **coût/risque croissant** : MCP/npm ne demandent
+  ni paiement ni mainnet → on se positionne tôt et gratuitement, on apprend le pipeline de publication. Bazaar
+  exige un 402 qui marche mais reste testnet → étape suivante logique. BlockRun apporte le plus de trafic mais
+  son intérêt réel (volume payant) est couplé au mainnet → on le garde pour la fin de la séquence, contact
+  préparé mais activation pleine = porte humain.
+- On séquence par **ce qu'on peut faire seul sans toucher à l'argent réel** d'abord (mandat CEO : décider tant
+  que ce n'est pas mainnet/USDC réel), et on isole proprement les deux points d'escalade (RPC payant, mainnet).
+- Être listé tôt sur MCP Registry = historique de fiabilité qui commence à courir avant même le revenu (§4, §13).
+
+**Hypothèses & risques :**
+- Hypothèse : l'auto-opt-in Bazaar via facilitator CDP fonctionne sans config lourde. Si le facilitator CDP
+  impose une étape custody/compte qui touche aux fonds → revérifier, possible escalade.
+- Risque : publier sur MCP Registry en « testnet/preview » et ne pas tenir l'uptime nuirait à la réputation
+  naissante. Mitigé par le déclencheur « 3 jours uptime » avant publication et par un libellé honnête du statut.
+- Risque : BlockRun pourrait demander un endpoint mainnet pour onboarder. Si c'est le cas, le **contact** reste
+  possible (préparer le terrain) mais l'**activation** attend l'escalade mainnet. Ne pas promettre de mainnet à
+  bc1max sans accord humain.
+
+**Succès mesuré par :**
+- Phase 3 : présence vérifiable sur MCP Registry + package npm résolvable, schéma d'outil MCP lisible (pricing,
+  inputs/outputs décrits). Seuil : découvrable et appelable par un client MCP tiers en testnet.
+- Phase 4 : apparition dans le catalogue Bazaar via `/discovery/resources`, premier appel testnet venu d'un
+  chemin de découverte (pas d'un appel direct codé en dur).
+- Contact BlockRun : réponse de bc1max + critères d'onboarding obtenus et documentés dans ce journal.
+
+**Handoff :** voir bloc Handoff CTO consolidé ci-dessous.
+
+## 2026-06-16 — CEO — Handoff consolidé → cto-agent (contraintes des 2 décisions ci-dessus)
+
+Contraintes techniques imposées par les décisions Pricing + Listing. À traiter par `cto-agent` (le « comment ») :
+
+**A. Pricing — exposition et structure**
+1. **3 routes/tiers** à implémenter, alignées sur le coût de calcul : `tier=quote` (A), `tier=risk` (B, défaut),
+   `tier=deep` (C). Le tier B doit être la route par défaut si le paramètre est absent.
+2. **Métadonnées de pricing machine-readable** à exposer partout (OpenAPI, schéma MCP, llms.txt, et dans les
+   termes du `402`) : prix par tier (0,008 / 0,02 / 0,04 $), réseau, token (USDC), adresse de destination,
+   latence typique par tier. Le prix doit être lisible AVANT l'appel pour que l'agent puisse décider.
+3. **Le montant du 402 doit dépendre du tier demandé** : le middleware x402 calcule le montant en fonction du
+   paramètre `tier` de la requête entrante, puis génère le 402 correspondant. Pas de prix codé en dur unique.
+4. **Mode testnet = prix 0 $ (ou symbolique testnet)** piloté par variable d'environnement / flag de config,
+   strictement séparé du prix mainnet. Aucune valeur mainnet ne doit être active sans bascule explicite (qui
+   sera déclenchée par le humain). Clé wallet en secret manager, jamais en repo (§14).
+5. Le calcul doit rester **déterministe et vérifiable** (math AMM) pour défendre l'exactitude — tier C inclut
+   le cross-check interne (jamais redistribution de données d'agrégateur, sourcing on-chain — décision actée).
+
+**B. x402 middleware — comportement attendu**
+6. Flux 402 → pay → serve complet sur **testnet d'abord** ; vérification de paiement via facilitator (vérifier
+   signatures/options sur doc live, ne pas déduire de CLAUDE.md — §0). Le middleware doit lire le tier, fixer le
+   montant, émettre le 402, vérifier la preuve, puis débloquer la réponse JSON.
+7. **Ne pas activer mainnet.** Toute bascule mainnet / vrai USDC est un point d'escalade humain. Préparer le code
+   pour que la bascule soit un changement de config revu, pas une réécriture.
+
+**C. Discovery artifacts requis (conditionnent l'ordre de listing)**
+8. **Pour le listing #1 (MCP Registry + npm)** : `server.json` valide, publication via CLI `mcp-publisher`,
+   package npm résolvable, **schéma d'outil MCP** décrivant inputs (token/pool/size/tier), outputs (exit-cost,
+   depeg-risk, fragilité), et **pricing par tier**. Prérequis CEO : 3 jours uptime testnet + schéma stable.
+9. **Pour le listing #2 (Bazaar)** : activer l'**extension de route bazaar** + exposer l'endpoint
+   `/discovery/resources` du facilitator ; vérifier l'auto-opt-in via facilitator CDP. Prérequis CEO : flux 402
+   validé end-to-end testnet.
+10. **Pour le listing #3 (BlockRun)** : avoir prêts docs en **markdown brut** (URL + `.md`), **OpenAPI** complet,
+    **llms.txt** à la racine, et un flux 402 démontrable. Le contact bc1max se fait avec ce kit, pas avant.
+11. **Monitoring dès le testnet** : uptime, latence p50/p95, taux d'erreur, nb d'appels par tier — ces métriques
+    sont les déclencheurs des listings (3j / 7j d'uptime) ET le socle de la future réputation (§13). À avoir tôt.
+
+**D. Points d'escalade (ne PAS décider côté agents)**
+- Passage RPC/indexeur **payant** → dépense réelle → humain (impacte le plancher de prix 0,008 $).
+- Passage **mainnet** / vrai USDC / activation pricing réel / listing BlockRun sur trafic payant → humain.
+
+## 2026-06-16 — CTO — Architecture endpoint #1 (ADR-001)
+
+**Décision :** Architecture des 7 composants de l'endpoint #1 figée dans
+`decisions/adr/ADR-001-architecture-endpoint-1.md`. Synthèse :
+- **Sourcing on-chain Base** : Aerodrome via **LpSugar** (`byAddress/byIndex/all`, struct = reserves, tick,
+  sqrt_ratio, type) + **Uniswap v3** (`slot0`/`liquidity` + **QuoterV2.quoteExactInputSingle** comme ground
+  truth, car liquidité v3 fragmentée par tick = pas de formule fermée). RPC **public** Base en MVP dev.
+- **Compute** : exit-cost size-aware (v2 = math fermée sur réserves ; v3 = via Quoter), depeg-risk on-chain,
+  fragilité agrégée multi-pools (poids versionnés `frag_model_version`). Mapping aux 3 tiers : quote = 1 pool/
+  1 size ; risk (défaut) = + depeg + fragilité ; deep = courbe multi-size + cross-check interne.
+- **API** : route unique versionnée `GET /v1/liquidity/exit-cost?token&pool&size&tier` (défaut `risk`),
+  schéma JSON stable additif-only, `schema_version`.
+- **x402** : `x402[fastapi]` v2.13.0, `PaymentMiddlewareASGI`, scheme EVM `exact`, facilitator testnet
+  `x402.org` (Base Sepolia `eip155:84532`). Montant **par tier** depuis une table de pricing unique ;
+  `NETWORK_MODE=testnet|mainnet` sépare facilitator/réseau/prix ; testnet = 0 $. Wallet en env/secret manager.
+- **MCP** : SDK `mcp` v1.27.2, transport **streamable-http**, outil `liquidity_exit_cost` (inputs token/pool/
+  size/tier ; output schéma §3 ; pricing par tier décrit).
+- **Discovery** : `server.json` (schema 2025-10-17, remotes streamable-http) + `mcp-publisher` → listing #1
+  (3 j uptime) ; extension `bazaar` + `/discovery/resources` → listing #2 (402 validé) ; llms.txt + OpenAPI +
+  docs markdown → listing #3 (7 j uptime, contact bc1max). Pricing machine-readable répliqué partout depuis
+  la table unique.
+- **Monitoring** dès testnet : uptime, latence p50/p95 (globale + par tier), taux d'erreur, appels par tier.
+
+**Doc live consultée :**
+- `https://pypi.org/pypi/x402/json` → **x402 2.13.0**, extras `fastapi/svm/mcp/evm/extensions` confirmés.
+- `https://docs.x402.org/getting-started/quickstart-for-sellers` → imports/middleware FastAPI, facilitator
+  testnet `https://x402.org/facilitator`, CAIP-2 Base Sepolia `eip155:84532` / Base `eip155:8453`.
+- `https://docs.x402.org/extensions/bazaar` → opt-in déclaratif extension bazaar, `/discovery/resources`.
+- `https://pypi.org/pypi/mcp/json` → **mcp 1.27.2**, transport `streamable-http` confirmé.
+- `https://modelcontextprotocol.io/registry/quickstart` → `server.json` (schema 2025-10-17), CLI
+  `mcp-publisher`, `remotes[].type="streamable-http"`.
+- `https://github.com/velodrome-finance/sugar` (LpSugar v3 `0xa7638d351040e2adce3eca81b07132c5df4b99bd`) →
+  fonctions et champs Lp struct.
+- Uniswap `v3-core IUniswapV3PoolState` + `v3-periphery QuoterV2` → `slot0/liquidity` + simulation de swap.
+
+**Pourquoi / alternatives écartées :** on-chain comme source de vérité (redistribution propre) vs subgraph
+hébergé (ToS/dépendance) écarté du chemin servi ; QuoterV2 vs formule fermée v3 (impossible, liquidité par
+tick) ; route unique + défaut `risk` vs 3 routes séparées (simplicité de découverte) ; agrégateurs en
+cross-check interne seulement (pas de licence de redistribution).
+
+**Risques & comment c'est testé :** tests unitaires math bloquants (v2 vs manuel, v3 vs QuoterV2, fragilité
+vs pools synthétiques, couverture 100 % branches) ; test contractuel de schéma (anti-régression, condition du
+critère « 3 j uptime sans régression ») ; test E2E 402→pay→serve sur Base Sepolia + 402 bon montant par tier ;
+latence p95 tier B < 800 ms, part appels tier B > 60 % mesurées via monitoring.
+
+**🚨 Escalades (NON décidées) :** RPC/indexeur **payant** (dépense réelle, impacte plancher 0,008 $) ;
+**mainnet / vrai USDC / pricing réel / listing BlockRun sur trafic payant**. Code conçu pour que la bascule
+mainnet soit un changement de config revu, pas une réécriture.
+
+**À reconfirmer en doc live à l'implémentation :** adresses de contrats Base exactes (Sugar Slipstream,
+QuoterV2, factories) sur BaseScan / `deployments/base.env` ; API exacte du SDK x402 2.13 pour fixer le prix
+**dynamiquement par requête** (tier en query param) vs une `RouteConfig` par tier ; éventuel montant testnet
+non nul exigé par le facilitator pour valider la vérification.
+
+**Handoff :** ADR-001 prêt. Phase 1 (compute local + tests math + monitoring par tier) peut démarrer
+immédiatement sans toucher à l'argent. CEO : les déclencheurs de listing (3 j / 7 j uptime, flux 402 validé)
+sont câblés sur le monitoring dès le testnet. Humain : deux portes d'escalade isolées et inactives par défaut
+(RPC payant, mainnet) ; aucune valeur mainnet n'est active dans le code.
+
+## 2026-06-16 — BUILD — Phase 1 livrée (endpoint local, zéro fonds)
+
+**Statut :** Phase 1 (endpoint local) **terminée et vérifiée**. Aucune exposition argent réel, mode testnet
+par défaut, prix forcés à 0 $.
+
+**Livré :**
+- `compute/` (valeur ajoutée, stdlib pur, déterministe) : `amm.py` (constant-product + courbe stable Solidly
+  `x³y+xy³`, exit-cost size-aware, `max_size_for_cost` par bisection), `routing.py` (meilleur venue),
+  `depeg.py` (déviation/dispersion/score pondéré liquidité, poids versionnés v1), `fragility.py` (depth +
+  concentration HHI + convexité, poids versionnés v1), `tiers.py` (quote/risk/deep).
+- `chain/` : `FixturePoolProvider` (pools déterministes WETH/THIN/USDX, offline) + factory ; `OnChainPoolProvider`
+  (web3 lazy, **refuse de tourner sur des adresses devinées** — registre vide tant que non vérifié live, conforme
+  mandat CTO §0).
+- `api/` : FastAPI `GET /v1/liquidity/exit-cost` (défaut `risk`), `/health`, `/metrics`, `/pricing` ; schéma
+  pydantic stable additif-only ; `pricing.py` = **table de prix source unique** (quote 0,008 / risk 0,02 /
+  deep 0,04 $ mainnet, 0 $ testnet).
+- `monitoring/` : uptime, latence p50/p95 (global + par tier), taux d'erreur, appels par tier.
+- `config.py` : `NETWORK_MODE` (testnet défaut) + `POOL_SOURCE` (fixture défaut) ; CAIP-2 et facilitator testnet
+  confirmés en doc live. `.env.example`, `.gitignore` (secrets exclus), `README.md`, `pyproject.toml`.
+
+**Vérifié :** **42 tests verts** (33 math stdlib sans dépendance + 9 API end-to-end via TestClient). Démo :
+token THIN (pool fin unique) → coût de sortie ~1134 bps sur 5000 (signal de fragilité) ; USDX stable près du
+peg → 4,7 bps + depeg ≈ 0. C'est l'intelligence différenciée visée (pas un prix brut).
+
+**Non fait (volontairement) :** x402 middleware (Phase 2), wrapper MCP + discovery artifacts (Phase 3),
+intégration on-chain réelle (registre de pools à peupler depuis source vérifiée, ADR-001). Aucune touche mainnet.
+
+**Handoff :** prêt pour Phase 2 (x402 sur testnet Base Sepolia) — décision CTO requise sur l'API exacte du SDK
+x402 2.13 (prix dynamique par tier) à reconfirmer en doc live. Portes d'escalade humain inchangées (RPC payant,
+mainnet) — toujours inactives.
+
+## 2026-06-16 — BUILD — Phase 2 x402 (testnet) livrée via pipeline multi-agents
+
+**Process :** 1 agent CTO spec (install + introspection x402 2.13.0 + doc live) → 5 codeurs sur fichiers disjoints
+→ intégration CTO (câblage opt-in + run tests) → 5 testeurs/sécurité → corrections → 3 agents de consolidation.
+SDK x402 confirmé : `x402` 2.13.0, middleware officiel `PaymentMiddlewareASGI`, scheme EVM `exact`, prix dynamique
+par tier via `DynamicPrice` callback (`ctx.adapter.get_query_param("tier")` confirmé sûr en introspection).
+
+**Livré :** package `src/agentdata/payment/` (middleware.py, facilitator.py, pricing_402.py) + câblage **opt-in**
+dans app.py (`X402_ENABLED`, défaut false → middleware non monté, Phase 1 intacte). Montant du 402 par tier depuis
+la table de prix unique (`api/pricing.py`), testnet = 0 $, facilitator testnet x402.org / Base Sepolia
+`eip155:84532`, scheme `exact`. Flux verify→settle fail-closed (géré par le SDK : body bufferisé, 502 sur erreur
+facilitator, 402 sur échec settle). `docs/x402-integration.md`, `.env.example` mis à jour.
+
+**Findings sécurité traités (consolidation) :**
+- 🔴 HIGH (bloquant) — **Garde-fou mainnet ADR-001 §4 absent** → CORRIGÉ : `src/agentdata/safety.py` `guard_network()`
+  + champ `allow_mainnet` (env `ALLOW_MAINNET`, défaut false). L'app **refuse de démarrer en mainnet** sans
+  autorisation explicite ; invariant "testnet = 0 $" asserté. Vérifié en exécution.
+- 🟠 MEDIUM — **TOCTOU** (guard one-shot à l'import, endpoints relisent l'env par requête) → CORRIGÉ : `guard_network`
+  est désormais appelé dans `load_settings()` à CHAQUE lecture → un flip mainnet au runtime échoue (fail-closed,
+  vérifié : 500). Garde aussi ajoutée en interne dans `build_x402_middleware` (défense en profondeur, tout futur
+  chemin de montage est gardé).
+- 🟡 LOW — **`facilitator_url` vide** avec x402 activé → CORRIGÉ : `build_x402_middleware` refuse de monter sans
+  facilitator. **`tier_price` sans try/except** (DoS route payante) → CORRIGÉ : repli sur DEFAULT_TIER. **Doc
+  `ALLOW_MAINNET`** → ajoutée à `.env.example`.
+
+**Tests :** **71 verts** (42 Phase 1 + 21 paiement + 4 garde-fou réseau + 4 hardening). Aucune régression, schéma
+API inchangé.
+
+**🚧 À traiter AVANT bascule mainnet (hardening tracké, non bloquant pour testnet) :**
+- F-2 : faire passer le flux "manuel" `payment_requirements()` (pricing_402.py) par le même invariant testnet/mainnet
+  que `guard_network` ; vérifier la présence de l'extra `x402[evm]` au chargement.
+- F-3 : centraliser `MAX_TIMEOUT_SECONDS` (dupliqué middleware.py / pricing_402.py) en source unique.
+- F-4 : ajouter un test anti-rejeu (facilitator mocké `is_valid=False, nonce_already_used` → 402, body non servi).
+- F-5 : `FacilitatorClient._to_dict` ne doit pas masquer une forme inconnue en dict ambigu → fail-closed explicite.
+- Post-escalade : valider format/allowlist de `FACILITATOR_URL` et `PAY_TO_ADDRESS` lors de la revue mainnet humaine.
+- E2E testnet réel (402→pay→serve contre le vrai facilitator) : nécessite un **wallet Base Sepolia financé** =
+  action humaine ; vérifier alors si le facilitator accepte un montant 0 $ ou exige un montant testnet symbolique.
+
+**Handoff :** Phase 2 prête côté code sur testnet (opt-in, gardée). Reste : E2E testnet réel (wallet financé = humain),
+puis Phase 3 (MCP + discovery artifacts). Mainnet toujours verrouillé (double garde : refus démarrage + refus par requête).
+
+## 2026-06-16 — CEO — Prochaine étape : Phase 3 (Découvrabilité) en priorité, E2E testnet en parallèle, hardening différé
+
+**Décision :** La prochaine étape de travail est **(A) Phase 3 — Découvrabilité** : wrapper MCP (transport
+streamable-http, outil `liquidity_exit_cost`) + discovery artifacts (`server.json`, OpenAPI, `llms.txt`, docs
+markdown brut), avec pricing par tier machine-readable répliqué partout depuis la table unique. **Séquence retenue :**
+1. **MAINTENANT → cto-agent : Phase 3** (ne dépend d'aucun fonds, avance directement le listing #1 MCP Registry + npm).
+2. **EN PARALLÈLE → humain : préparer le wallet Base Sepolia financé** (débloque l'option C / E2E testnet réel, qui
+   est le prérequis du listing #2 Bazaar — sans bloquer A).
+3. **PLUS TARD → (B) hardening F-2..F-5 : différé**, à traiter juste avant la bascule mainnet (lointaine, escalade humain),
+   PAS maintenant. Exception : si Phase 3 touche `pricing_402.py` / la table de prix, intégrer F-2 et F-3 à ce moment-là
+   (coût marginal nul, pas de détour).
+
+**Pourquoi :**
+- North Star honnête (CLAUDE.md §4, §3 de ma définition) : les premiers mois = **fiabilité + découvrabilité +
+  positionnement**, pas le revenu. La Phase 3 est exactement cette fonction-objectif. Elle fait **démarrer
+  l'historique d'uptime/fiabilité** (déclencheur listing #1 : 3 j uptime testnet + schéma stable) — du temps qui
+  court à notre avantage, gratuitement, dès maintenant.
+- A ne dépend d'**aucun fonds** et n'a **aucun point d'escalade** : c'est pleinement dans mon mandat et exécutable
+  immédiatement par cto-agent. C'est le seul des trois qui crée de la **valeur de découvrabilité nette** tout de suite.
+- C (E2E testnet réel) est **bloqué sur une action humaine** (wallet financé) → on ne le met pas sur le chemin
+  critique, mais on le **déclenche en parallèle** car c'est le prérequis du listing #2 (Bazaar) et la dernière
+  validation testnet manquante. Le faire avancer en fond évite qu'il devienne le goulot une fois A livrée.
+- B (hardening) **n'apporte pas de découvrabilité** et n'est utile que juste avant le mainnet, qui est lointain et
+  sous escalade humain. Le journal le qualifie déjà explicitement « non bloquant pour testnet ». Le faire maintenant
+  = optimiser un risque qui ne se matérialise pas avant le mainnet, au détriment du temps d'uptime qui, lui, court
+  maintenant. Mauvais arbitrage de séquencement → différé (sauf F-2/F-3 si on est déjà dans ces fichiers).
+
+**Hypothèses & risques :**
+- Hypothèse : publier MCP Registry/npm en **testnet/preview** ne nuit pas à la réputation naissante TANT QUE le
+  libellé de statut est honnête et que le déclencheur « 3 j uptime sans régression de schéma » est respecté AVANT
+  publication (cf. décision listing du 16/06). Risque réputationnel si on publie trop tôt → mitigé par ce gate.
+- Risque : Phase 3 livrée mais E2E testnet réel toujours bloqué (wallet non fourni) → on peut publier listing #1
+  (qui n'exige pas le 402 réglé) mais **pas** listing #2 (Bazaar, qui exige le flux 402 validé end-to-end). Acceptable :
+  A débloque le listing à plus fort effet-historique en premier ; Bazaar suit dès le wallet dispo.
+- Risque technique : le wrapper MCP doit exposer le **même** pricing/schéma que l'API REST depuis la table de prix
+  unique (pas de divergence) — sinon incohérence machine-readable qui casse la sélection par l'agent. À tester.
+- Hypothèse : le code Phase 1/2 (schéma JSON, table de prix unique) est stable → le wrapper MCP s'y branche sans
+  refonte. Vérifié par le journal (schéma additif-only, table source unique).
+
+**Succès mesuré par :**
+- **Court terme (Phase 3 done) :** `server.json` valide + publié via `mcp-publisher`, package npm résolvable,
+  serveur MCP **appelable par un client MCP tiers en testnet** (outil `liquidity_exit_cost` avec inputs token/pool/
+  size/tier, outputs exit-cost/depeg-risk/fragilité, pricing par tier lisible). `llms.txt` à la racine + OpenAPI
+  complet + docs markdown brut servis. Pas de régression : tests toujours verts, schéma API inchangé.
+- **Déclencheur listing #1 armé :** monitoring testnet tourne en continu → **3 jours d'uptime sans régression de
+  schéma** atteints = feu vert publication MCP Registry. C'est la métrique qui compte (l'historique de fiabilité
+  commence à courir).
+- **Parallèle (humain) :** wallet Base Sepolia financé fourni → débloque E2E testnet réel → prérequis listing #2.
+
+**Handoff :**
+- **cto-agent (à faire ensuite, maintenant) :** lancer **Phase 3** par ordre d'effet sur le listing #1 :
+  (1) **wrapper MCP** SDK `mcp` 1.27.2, transport **streamable-http**, outil `liquidity_exit_cost` (schéma ADR-001),
+  pricing par tier décrit depuis la table unique ;
+  (2) **`server.json`** (schema 2025-10-17, remotes streamable-http) + chaîne de publication `mcp-publisher` + package
+  npm résolvable (libellé **testnet/preview** honnête) ;
+  (3) **discovery artifacts** : `llms.txt` à la racine, **OpenAPI** complet, **docs markdown brut** (URL + `.md`),
+  métadonnées pricing/latence/schéma machine-readable répliquées depuis la table de prix unique ;
+  (4) garder le **monitoring testnet** allumé en continu pour faire courir le compteur d'uptime (déclencheur 3 j) ;
+  (5) **ne pas** traiter F-2..F-5 maintenant **sauf** si l'implémentation touche `pricing_402.py` / la table de prix
+  → alors intégrer **F-2** (invariant testnet/mainnet sur `payment_requirements()` + check extra `x402[evm]`) et
+  **F-3** (centraliser `MAX_TIMEOUT_SECONDS`) au passage, coût marginal nul ;
+  (6) reconfirmer en **doc live** (MCP Registry quickstart, SDK mcp 1.27.2) avant publication — ne pas déduire les
+  signatures du journal (CLAUDE.md §0). **Ne PAS toucher au mainnet** : portes d'escalade inchangées.
+- **Humain (en parallèle, non bloquant pour A) :** préparer et **financer un wallet Base Sepolia** (USDC + gas de
+  test) dédié à l'E2E testnet, et le fournir à cto-agent quand prêt → débloque l'E2E réel (option C) et le listing #2
+  (Bazaar). Vérifier à ce moment si le facilitator x402.org accepte un montant **0 $** ou exige un **montant testnet
+  symbolique**. Rappel : ceci reste du **testnet** (pas de vrai USDC, pas de mainnet — toujours sous verrou).
+- **Différé (ni A ni parallèle) :** hardening pré-mainnet **F-2..F-5** (sauf F-2/F-3 opportunistes ci-dessus) → à
+  planifier dans la revue sécurité **juste avant l'escalade mainnet** (Phase 5), pas avant.
+
+## 2026-06-16 — BUILD — Phase 3 (MCP + découvrabilité) livrée via pipeline multi-agents
+
+**Process :** spec CTO (introspection `mcp` 1.27.2 + doc live registre) → 5 codeurs (fichiers disjoints) →
+intégration CTO → 5 testeurs/sécurité → correctif ciblé. **Aucun finding bloquant.**
+
+**Livré :**
+- Package `src/agentdata/mcp/` : `tool_schema.py` (source unique du schéma de l'outil), `server.py`
+  (outil `liquidity_exit_cost`, transport **streamable-http**, réutilise le MÊME chemin que l'API REST :
+  get_provider → compute_tier ; point d'entrée `python -m agentdata.mcp.server`, jamais lancé à l'import).
+- Discovery artifacts : `llms.txt` (racine, complet : endpoint, tiers+prix, liens), `docs/api.md` (doc markdown
+  brute), OpenAPI enrichi (tags/description/contact/licence), `server.json` (manifest MCP Registry) + `package.json`.
+- Routes FastAPI ajoutées : `GET /llms.txt` et `GET /docs/api.md` (servies en brut, distinctes du Swagger `/docs`).
+
+**Findings traités :**
+- 🟠 MEDIUM (discovery) — **`llms.txt` annonçait `/docs/api.md` → 404** (fichier présent mais non servi) → CORRIGÉ :
+  route `GET /docs/api.md` ajoutée ; tous les liens du llms.txt résolvent (200), pas de collision Swagger. Test
+  `tests/test_discovery.py` ajouté (verrouille la surface servie).
+- ℹ️ Correction doc : le schéma du registre MCP est **`2025-12-11`** en live (pas `2025-10-17` comme noté dans
+  ADR-001/anciennes entrées — id obsolète). Le `server.json` utilise déjà le bon `$schema`.
+
+**Tests :** **91 verts** (71 Phases 1+2 + 15 MCP + 5 discovery). Schéma API inchangé, garde-fous mainnet intacts.
+
+**🚧 Dépendances HUMAINES pour le listing #1 (MCP Registry + npm) :**
+- Choisir le **namespace** (GitHub `io.github.<user>/...` ou domaine custom via DNS auth) — placeholder dans server.json.
+- Fournir le **host de déploiement public** (`remotes[].url`) — nécessite de déployer le service (Railway/Render/Fly).
+- Puis **3 j d'uptime testnet** sans régression de schéma → feu vert publication (`mcp-publisher`, étape humaine).
+
+**Handoff :** code Phase 3 prêt (testnet). Listing #1 gated sur déploiement + namespace (humain) + 3 j uptime.
+E2E testnet (option C) attend le wallet Base Sepolia financé (humain, en cours). Mainnet toujours verrouillé.
+
+## 2026-06-16 — CEO — Namespace marque Phenicea + cible de déploiement testnet + déblocage listing #1
+
+**Décision :**
+
+**1. Namespace MCP exact = GitHub org auth (PAS domaine custom pour l'instant).**
+- Nom MCP (`server.json` `name` ET `package.json` `mcpName`) : **`io.github.phenicea/agentdata-liquidity-exit-cost`**.
+  Auth = GitHub OAuth via `mcp-publisher login github`. Confirmé doc live : GitHub auth accepte `io.github.orgname/*`
+  (pas seulement un user perso), donc l'org GitHub `phenicea` est le préfixe légitime.
+- Nom npm : **`@phenicea/agentdata-liquidity-exit-cost`** (scope npm = la marque).
+  ⚠️ **Mais npm n'est PAS requis pour le listing #1** : confirmé doc live, un serveur **remote** (`remotes[].type=streamable-http`)
+  se liste au registre **avec une simple URL, sans package npm publié**. Le `packages[]`/npm ne sert qu'à une install stdio
+  locale, qu'on n'offre pas. → On garde le nom npm **réservé** sous `@phenicea` (cohérence de marque + option future),
+  mais on ne le met PAS sur le chemin critique de publication. Le listing #1 = `server.json` remote + `mcp-publisher publish`.
+- **Pourquoi GitHub org plutôt que domaine custom (`ai.phenicea` / `com.phenicea`)** : le domaine custom (DNS auth) exige de
+  **posséder + prouver un domaine** (clé Ed25519 + TXT record `v=MCPv1; k=ed25519; p=...`), ce qui ajoute un achat de domaine
+  (= **dépense réelle → escalade humain**) et une étape DNS, pour **zéro gain de découvrabilité** au stade actuel (le registre
+  ne classe pas par "beauté" du namespace, l'agent sélectionne sur prix/latence/fiabilité/schéma — cf. CLAUDE.md §10). On ne
+  paie pas un domaine pour de l'esthétique de marque tant qu'on n'a pas de revenu. Le namespace reste **migrable plus tard**
+  vers `com.phenicea/...` ou `ai.phenicea/...` quand le fondateur voudra investir dans le domaine (on publiera une nouvelle
+  entrée qui supersède — coût: re-listing, pas une réécriture de code).
+
+**2. Cible de déploiement testnet = Render (Web Service), tier gratuit, pour démarrer le compteur d'uptime.**
+- **Recommandation : Render**, en acceptant explicitement sa limite, AVEC un keep-alive. Raison : c'est la seule des 4 options
+  qui offre un **vrai tier gratuit sans carte bancaire requise** (donc **PAS de dépense réelle → reste dans mon mandat, pas
+  d'escalade**), supporte nativement un serveur **Python ASGI long-running** (uvicorn/FastAPI + transport MCP streamable-http),
+  et est simple/vibecodable (`render.yaml` ou détection auto).
+- **⚠️ Caveat décisif (fait live)** : en 2026, **aucun** tier gratuit (Render/Railway/Fly/Cloudflare) n'est "always-on". Render
+  free **dort après 15 min d'inactivité** (cold start 30–60 s). Or notre déclencheur de listing #1 = **"3 jours d'uptime testnet
+  sans régression de schéma"**. Donc : **uptime mesuré = uptime applicatif (réponses 200 cohérentes + schéma stable), pas
+  "process jamais évincé"**. On **neutralise le sommeil** avec un **health-check ping externe gratuit** (ex. cron-job.org ou
+  UptimeRobot, gratuits, sans CB) qui frappe `/health` toutes les ~10 min → le service reste chaud et le moniteur d'uptime
+  tourne. C'est suffisant pour du **testnet/preview** (on n'a pas encore de trafic d'agents réel à servir).
+- **Cloudflare Workers écarté** : modèle d'exécution éphémère/edge, mauvais fit pour un serveur ASGI Python long-running avec
+  état de connexion streamable-http. **Railway / Fly écartés au stade testnet** : exigent une **CB / post-paid** dès le départ
+  (Railway: $5 trial one-shot puis payant ; Fly: CB obligatoire, plus de free tier) → **dépense réelle = escalade humain**, qu'on
+  évite tant que le gratuit suffit. **Bascule prévue** : quand on aura besoin d'un vrai always-on (proximité mainnet / trafic réel
+  via BlockRun), **passer sur Railway ou Fly en plan payant = décision à escalader au humain** (petite dépense récurrente).
+
+**3. À exécuter MAINTENANT (zéro argent, zéro mainnet) :** voir Handoff CTO ci-dessous. En résumé : figer le namespace Phenicea
+dans `server.json`/`package.json`, préparer la config de déploiement Render (Dockerfile/render.yaml + entrypoint MCP
+streamable-http), brancher un keep-alive gratuit sur `/health`, déployer en testnet/preview, et **une fois l'URL connue**, y
+brancher `remotes[].url`, `websiteUrl`, OpenAPI `servers[]` et les liens du `llms.txt`. Puis laisser courir le compteur 3 j.
+
+**Pourquoi :**
+- Conforme au mandat CEO : tout ceci est **gratuit + testnet + réversible** → pleinement dans mon périmètre, **aucune escalade
+  argent** sauf les deux micro-escaladess "compte/possession" notées ci-dessous (créer l'org GitHub, et — seulement si plus tard —
+  acheter un domaine ou un plan payant).
+- North Star (CLAUDE.md §4) : l'objectif des premiers mois = **fiabilité + découvrabilité + historique d'uptime qui court**.
+  Déployer maintenant, même sur un free tier qui dort, fait **démarrer le compteur 3 j** (avec keep-alive) → on débloque le
+  listing #1 (le plus fort effet-historique, qui n'exige NI 402 réglé NI mainnet) au plus vite et au coût zéro.
+- On **n'achète pas de marque** (domaine) ni de compute payant tant que le revenu n'existe pas : le namespace GitHub org donne la
+  marque "Phenicea" gratuitement et reste migrable.
+
+**Hypothèses & risques :**
+- Hypothèse : l'org GitHub `phenicea` est **disponible** et le fondateur la crée. Si `phenicea` est pris sur GitHub, fallback :
+  variante proche (`phenicea-ai`, `phenicea-labs`) → le namespace devient `io.github.phenicea-ai/...` (à acter alors). Le scope
+  npm `@phenicea` doit aussi être libre ; sinon `@phenicea-ai`.
+- Risque réputation : publier en testnet/preview puis ne pas tenir l'uptime nuit à la réputation naissante → mitigé par (a) le
+  gate "3 j uptime sans régression de schéma" AVANT `mcp-publisher publish`, (b) le keep-alive, (c) le libellé honnête
+  "Testnet / preview" déjà dans la description.
+- Risque keep-alive/free tier : si Render free s'avère trop instable même avec ping (évictions, quotas), le compteur 3 j ne tiendra
+  pas → fallback = **escalade humain pour un petit plan payant** (Railway/Render Starter, quelques $/mois). On tente le gratuit
+  d'abord ; on n'escalade la dépense que si le gratuit échoue à tenir 3 j.
+- Risque migration namespace : si le fondateur veut plus tard `com.phenicea/...`, il faudra re-lister (nouvelle entrée registre) —
+  acceptable, c'est de la config/re-publication, pas du code.
+
+**Succès mesuré par :**
+- Namespace figé : plus aucun `PLACEHOLDER-GITHUB-USER` dans `server.json`/`package.json` ; `name` == `mcpName` ==
+  `io.github.phenicea/agentdata-liquidity-exit-cost` (invariant du registre respecté).
+- Déploiement : service testnet répond `200` sur `/health`, `/mcp` (streamable-http) joignable publiquement en HTTPS,
+  `remotes[].url` pointant dessus.
+- Déclencheur listing #1 armé : **3 jours d'uptime applicatif continu sans régression de schéma** (monitoring + keep-alive) →
+  feu vert `mcp-publisher publish`. Métrique qui compte : l'historique de fiabilité commence à courir.
+
+**Handoff :** voir bloc Handoff CTO ci-dessous.
+
+## 2026-06-16 — CEO — Handoff consolidé → cto-agent (déploiement Render + namespace Phenicea)
+
+À traiter par `cto-agent` (le "comment"). **Aucune touche mainnet, aucune dépense** (free tier only ; toute bascule payante = escalade humain).
+
+**A. Figer le namespace Phenicea (dès maintenant, ne dépend de rien) :**
+1. Dans `server.json` : `name` → `io.github.phenicea/agentdata-liquidity-exit-cost`. Remplacer aussi les
+   `PLACEHOLDER-GITHUB-USER` dans `websiteUrl` et `repository.url` par l'org `phenicea` (ex.
+   `https://github.com/phenicea/agentdata`). NE PAS encore toucher `remotes[].url` (attend l'URL Render — étape C).
+2. Dans `package.json` : `name` → `@phenicea/agentdata-liquidity-exit-cost` ; `mcpName` →
+   `io.github.phenicea/agentdata-liquidity-exit-cost` (doit être identique à `server.json.name`) ;
+   `repository.url`, `homepage`, `bugs.url` → org `phenicea`.
+3. Vérifier l'invariant registre : `server.json.name` === `package.json.mcpName`. (Confirmé doc live : doivent matcher.)
+4. **Ne pas publier npm** : le listing #1 est un serveur **remote** (URL only), npm non requis. Garder le package comme
+   réservation de marque (`@phenicea`), `private:false` ok mais publication npm = étape optionnelle ultérieure, pas sur le
+   chemin critique.
+
+**B. Préparer la config de déploiement Render (testnet/preview, free tier) :**
+5. Ajouter un artefact de déploiement reproductible : **Dockerfile** (Python 3.x slim + install `pyproject` + extras MCP) OU
+   `render.yaml` (type: web, env: python, `buildCommand`/`startCommand`). Entrypoint = serveur MCP **streamable-http** exposé
+   publiquement (le serveur actuel `python -m agentdata.mcp.server` + l'app FastAPI qui sert `/health`, `/metrics`, `/pricing`,
+   `/llms.txt`, `/docs/api.md`, et le mount MCP `/mcp`). Bind sur `0.0.0.0:$PORT` (Render injecte `$PORT`).
+6. **Variables d'env Render** : `NETWORK_MODE=testnet` (défaut), `X402_ENABLED` selon besoin de démo (peut rester false pour
+   le listing #1 qui n'exige pas le 402), **`ALLOW_MAINNET` absent/false** (garde-fou intact), `POOL_SOURCE=fixture` tant que
+   l'on-chain réel n'est pas câblé sur adresses vérifiées. **Aucun secret/clé wallet en repo** (§14) — si une clé testnet est
+   nécessaire plus tard pour l'E2E, en var d'env Render, jamais commitée.
+7. Vérifier en **doc live** au moment de l'implémentation : commande de start exacte pour servir le transport streamable-http
+   du SDK `mcp` 1.27.2 derrière uvicorn/ASGI sur un PaaS (host/port/path) — ne pas déduire du journal (CLAUDE.md §0).
+
+**C. Brancher l'URL publique une fois le déploiement live :**
+8. Récupérer l'URL Render (forme `https://<service>.onrender.com`). Mettre à jour :
+   - `server.json` → `remotes[0].url` = `https://<service>.onrender.com/mcp` (ou le path réel du mount MCP).
+   - OpenAPI → `servers[].url` = base publique ; liens du `llms.txt` (endpoint, docs `.md`, OpenAPI) → URLs publiques absolues.
+   - Vérifier que tous les liens `llms.txt` résolvent en 200 sur l'host public (test discovery déjà en place — le rejouer
+     contre l'URL publique).
+9. **Keep-alive gratuit** : configurer un ping externe (cron-job.org / UptimeRobot, gratuit, sans CB) sur `/health` toutes les
+   ~10 min pour neutraliser le sommeil free-tier et alimenter le compteur d'uptime. Documenter l'URL pingée.
+
+**D. Laisser courir + déclencher la publication :**
+10. Monitoring testnet allumé en continu ; viser **3 jours d'uptime applicatif sans régression de schéma**. À l'atteinte du
+    seuil → `mcp-publisher login github` (org `phenicea`) puis `mcp-publisher publish` (libellé testnet/preview honnête).
+    **Cette étape de publication finale nécessite l'auth GitHub de l'org → action humaine/fondateur** (login OAuth).
+11. **Ne pas** traiter F-2..F-5 (hardening pré-mainnet) — sauf coût marginal nul si on touche `pricing_402.py`. **Ne PAS**
+    activer mainnet ni x402 mainnet. Portes d'escalade inchangées.
+
+**E. Points d'escalade humain (ne PAS décider côté agents) :**
+- **Micro-escalade légère (compte/possession, pas d'argent)** : créer l'**org GitHub `phenicea`** (et idéalement réserver le
+  scope npm `@phenicea`). Sans ça, le namespace et la publication sont bloqués. Si `phenicea` indisponible → choisir une
+  variante et la communiquer (on réajuste le namespace).
+- **Escalade dépense (seulement si nécessaire plus tard)** : si le free tier Render ne tient pas 3 j même avec keep-alive, ou
+  quand on aura besoin d'un vrai always-on (proximité mainnet / trafic BlockRun réel) → **plan payant Railway/Fly/Render**
+  (quelques $/mois) = décision humain.
+- **Escalade marque (optionnelle, plus tard)** : acheter un domaine pour passer à `com.phenicea/...` ou `ai.phenicea/...`
+  (DNS auth) = dépense réelle → humain. Non nécessaire au stade actuel.
+- **Inchangé** : wallet Base Sepolia financé (humain, en cours) débloque E2E testnet → listing #2 Bazaar. Mainnet verrouillé.
+
+## 2026-06-16 — BUILD — Phase 3b : namespace Phenicea figé + deploy-readiness (Render) via pipeline
+
+**Process :** spec CTO (montage MCP streamable-http + FastAPI sur un seul port, mcp 1.27.2) → 4 codeurs → intégration
+CTO → 3 testeurs/sécurité. **Aucun finding bloquant** (tous pass, sévérité max low).
+
+**Décisions CEO appliquées :**
+- Namespace figé : `server.json.name` = `package.json.mcpName` = **`io.github.phenicea/agentdata-liquidity-exit-cost`** ;
+  npm `@phenicea/agentdata-liquidity-exit-cost` ; `$schema` 2025-12-11 ; `remotes[0].url` = placeholder
+  `https://PLACEHOLDER-RENDER-HOST/mcp` (à remplacer post-déploiement).
+- Cible : Render free tier, un seul process uvicorn servant REST + MCP.
+
+**Livré :**
+- `src/agentdata/asgi.py` : app ASGI combinée (FastAPI REST + MCP streamable-http monté sous `/mcp`, lifespan/session
+  manager du MCP câblé depuis le lifespan parent). Réutilise l'app et le serveur existants, zéro logique dupliquée.
+- `Dockerfile` + `render.yaml` + `.dockerignore` : Python, start `uvicorn agentdata.asgi:app --host 0.0.0.0 --port $PORT`,
+  build `pip install ".[mcp]"`. Env testnet (NETWORK_MODE=testnet, POOL_SOURCE=fixture, X402_ENABLED=false, PAS de
+  ALLOW_MAINNET). PAY_TO_ADDRESS/FACILITATOR_URL en env Render (`sync:false`, jamais committés). `healthCheckPath:/health`.
+- `tests/test_deploy.py` (12 tests).
+
+**Bloqueur de déploiement trouvé + corrigé (CTO) :** l'extra `mcp` n'était pas déclaré dans `pyproject.toml` →
+`pip install ".[mcp]"` n'installait rien (WARNING silencieux) → `ModuleNotFoundError` au build Render propre. Corrigé :
+ajout `[project.optional-dependencies] mcp = ["mcp>=1.27,<2"]`.
+
+**Vérifié :** **103 tests verts** (91 + 12 deploy). Smoke E2E local (lifespan démarré) : `/health` 200, `/v1/liquidity/
+exit-cost` 200, **`POST /mcp initialize` → 200** (handshake MCP JSON-RPC valide, protocole 2025-06-18), `/mcp/mcp` 404
+(pas de double préfixe). Garde-fous mainnet intacts. Aucun secret en repo.
+
+**🚧 Portes humaines pour publier le listing #1 (aucune n'expose d'argent réel) :**
+1. Créer l'org GitHub **`phenicea`** (+ réserver scope npm `@phenicea`). Si pris → fallback `phenicea-ai`/`phenicea-labs`.
+2. Déployer sur **Render** (compte humain) → récupérer l'URL → remplacer `PLACEHOLDER-RENDER-HOST` dans server.json
+   (+ OpenAPI servers[], liens absolus llms.txt) → keep-alive `/health` (~10 min).
+3. **3 j d'uptime testnet** sans régression de schéma → `mcp-publisher login github` (org phenicea) + `publish`.
+
+**Handoff :** code 100 % deploy-ready (testnet). Reste humain : org GitHub + déploiement Render + 3 j uptime + publish.
+E2E testnet (option C) attend le wallet Base Sepolia financé. Mainnet toujours verrouillé (double garde).

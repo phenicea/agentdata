@@ -1,0 +1,82 @@
+# AgentData — Executable Liquidity / Exit-Cost
+
+> Status: TESTNET / PREVIEW. No real funds. Prices are forced to $0 on testnet; the
+> figures below are the *mainnet target* prices, not active charges. Mainnet is a
+> separate, human-reviewed escalation.
+
+A pay-per-call data service for AI agents. It answers one question well: **if I exit
+this token position right now, what does it actually cost, how much can I move before
+slippage blows past a threshold, and how fragile is that liquidity?** The output is
+*computed, normalized, decision-grade* intelligence (size-aware exit cost, depeg risk,
+liquidity fragility) derived from on-chain AMM math on Base — not raw prices. Settled
+in USDC via the open x402 protocol (HTTP 402); the payment is the auth — no API key,
+no account, no subscription.
+
+This file is plain text and readable without JS or auth. Full machine docs are in
+markdown at the link below.
+
+## Service
+
+- Name: AgentData — Executable Liquidity / Exit-Cost (endpoint #1)
+- Chain: Base (testnet = Base Sepolia `eip155:84532`; mainnet = Base `eip155:8453`)
+- Settlement: USDC via x402 (`exact` EVM scheme), free testnet facilitator
+  `https://x402.org/facilitator`
+- Single purpose: one focused tool/endpoint, sourced on-chain (cleanly redistributable)
+- Determinism: AMM math is deterministic and verifiable against an on-chain swap quote
+
+## REST endpoint
+
+- `GET /v1/liquidity/exit-cost?token=<symbol|address>&size=<number>&tier=<quote|risk|deep>&pool=<id?>`
+  - `token` (required) — token to exit (sell).
+  - `size` (required, > 0) — sell size in human token units.
+  - `tier` (optional, default `risk`) — `quote` | `risk` | `deep`.
+  - `pool` (optional) — restrict the computation to a single pool id.
+  - Returns JSON: `exit_cost`, `route`, plus `fragility` and `depeg` (risk/deep), plus
+    `exit_cost_curve`, `max_size_before_cost`, `cross_check` (deep). Schema is stable
+    and additive-only within `/v1/`.
+
+Helper endpoints (no payment):
+
+- `GET /pricing` — machine-readable pricing table (single source of truth).
+- `GET /health` — status + network mode.
+- `GET /metrics` — uptime, latency p50/p95 (global + per tier), error rate, calls per tier.
+
+## MCP tool
+
+- Tool name: `liquidity_exit_cost`
+- Transport: streamable-http; remote MCP endpoint advertised at `<base_url>/mcp`.
+- Inputs: `token` (string, required), `size` (number > 0, required),
+  `tier` (enum `quote`|`risk`|`deep`, default `risk`), `pool` (string, optional).
+- Output: same structured schema as the REST endpoint (REST/MCP parity is guaranteed —
+  the tool calls the exact same compute path).
+- Reuses the single pricing table; per-tier pricing is described in the tool metadata.
+
+## Tiers and pricing
+
+Single source of truth: `agentdata/api/pricing.py`. Currency: USDC. Default tier: `risk`.
+Testnet price for every tier is **$0**. Mainnet target prices (not active):
+
+| Tier  | Contents                                                          | Mainnet target |
+|-------|------------------------------------------------------------------|----------------|
+| quote | best-route exit cost for one size                                | $0.008         |
+| risk  | exit cost + fragility (+ depeg for pegged assets) — **default**  | $0.02          |
+| deep  | risk + multi-size exit-cost curve + max-size-before-cost ladder  | $0.04          |
+
+Price floor defended at $0.008 (no race to the bottom). Pricing is readable *before*
+the call (here, `/pricing`, OpenAPI, and the MCP tool metadata) so an agent can choose
+the tier it needs.
+
+## Docs
+
+- Full API docs (markdown, raw): /docs/api.md
+- OpenAPI: /openapi.json
+- Pricing (live JSON): /pricing
+- Strategy / decisions: CLAUDE.md, decisions/DECISION_LOG.md, decisions/adr/
+
+## Notes for agents
+
+- Pick `quote` for a single pool/size lookup; `risk` (default) for the full risk view of
+  a token; `deep` for a liquidation ladder across sizes.
+- `fragility.score` and `depeg.score` are 0..100, higher = worse.
+- Costs are reported in bps and in output-token units.
+- Testnet/preview: do not treat output as mainnet-accurate until the listing is marked live.
