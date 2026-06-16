@@ -1,0 +1,90 @@
+# Render blueprint — AgentData PAY instance (testnet) — the x402-ENABLED service.
+#
+# This is the SECOND, SEPARATE Render Web Service: `agentdata-pay`. It exists to
+# light up the x402 payment middleware (X402_ENABLED=true) and, through it, the
+# declarative "bazaar" discovery extension carried on the priced RouteConfig.
+#
+# WHY A SECOND INSTANCE (do not merge into render.yaml):
+#   - render.yaml deploys listing #1 (`agentdata-liquidity-exit-cost`) with
+#     X402_ENABLED=false: $0, NO 402, NO bazaar extension, schema unchanged. That
+#     instance must stay exactly as-is — it is the live MCP Registry / listing #1
+#     surface and its 3-day uptime counter is running.
+#   - The bazaar extension activates ONLY when the x402 middleware is mounted
+#     (X402_ENABLED=true). Mounting it here, on a distinct service, opts THIS
+#     instance into bazaar discovery WITHOUT touching listing #1.
+#
+# Same repo, same combined ASGI app (`agentdata.asgi:app` = REST + MCP on one
+# $PORT). Same free tier, no card, no spend (CEO decision, DECISION_LOG
+# 2026-06-16). Free instances sleep after ~15 min idle — neutralize with an
+# EXTERNAL free keep-alive ping on /health (see docs/bazaar-deploy.md).
+#
+# HARD RULES (non-negotiable):
+#   - TESTNET ONLY. Base Sepolia (eip155:84532). NETWORK_MODE=testnet.
+#   - NO mainnet value active: ALLOW_MAINNET is deliberately NOT declared, so the
+#     app refuses to ever start on mainnet (ADR-001 §4 / safety.guard_network).
+#   - Testnet price stays $0 (the "testnet = $0" invariant). No real USDC anywhere.
+#   - NO secret in repo. Only the PUBLIC PAY_TO_ADDRESS is a runtime env var,
+#     entered in the Render dashboard (sync: false). The wallet PRIVATE KEY is
+#     never an env var here and is not needed by the seller side at all.
+#
+# DEPLOYMENT IS A HUMAN STEP. This file is deploy-ready config only — the agent
+# pipeline does NOT create the Render service or publish anything.
+
+services:
+  - type: web
+    name: agentdata-pay
+    runtime: python
+    plan: free
+    region: oregon
+    branch: master
+    # Editable install of the project + the extras this instance needs:
+    #   - mcp:        FastMCP / streamable-http used by agentdata.asgi
+    #   - fastapi/uvicorn come from pyproject deps
+    # The x402 extras (fastapi/evm/extensions) are required because the middleware
+    # is mounted here. ".[x402]" must resolve to x402[fastapi,evm,extensions]
+    # (the bazaar extension lives under x402.extensions). If the project does not
+    # expose a "x402" extra, install the SDK explicitly instead, e.g.:
+    #   pip install ".[mcp]" "x402[fastapi,evm,extensions]==2.13.*"
+    buildCommand: pip install ".[mcp]" "x402[fastapi,evm,extensions]==2.13.*"
+    # Single uvicorn process: REST + MCP + x402 middleware on the Render $PORT.
+    startCommand: uvicorn agentdata.asgi:app --host 0.0.0.0 --port $PORT
+    # Free-tier health probe; also the path the external keep-alive pings.
+    healthCheckPath: /health
+    # Auto-deploy on push to the tracked branch. Testnet-locked, so this is safe.
+    autoDeploy: true
+    envVars:
+      # --- the switch that makes THIS instance different from listing #1 -------
+      # Mounts the x402 payment middleware -> emits 402 on the priced route AND
+      # auto-opts-in the bazaar discovery extension (middleware mounted => bazaar
+      # active). This is the ONLY instance where this is "true".
+      - key: X402_ENABLED
+        value: "true"
+      # --- testnet lock -------------------------------------------------------
+      # Base Sepolia (eip155:84532), facilitator https://x402.org/facilitator.
+      # ALLOW_MAINNET is intentionally absent: the app cannot start on mainnet.
+      - key: NETWORK_MODE
+        value: testnet
+      # Deterministic offline pools — no RPC, no upstream secret needed.
+      - key: POOL_SOURCE
+        value: fixture
+      # --- PUBLIC receiving address only --------------------------------------
+      # Set in the Render dashboard, NEVER in repo. sync: false => Render prompts
+      # for the value and does not read it from this file. Required when
+      # X402_ENABLED=true (the app fails loud on an empty PAY_TO_ADDRESS rather
+      # than emitting an unpayable 402). Public testnet address:
+      # 0x5E442c144687De1D311855d65E87584BdEe7541A.
+      - key: PAY_TO_ADDRESS
+        sync: false
+      # --- optional facilitator override --------------------------------------
+      # Empty/unset => the testnet default (https://x402.org/facilitator) is used
+      # by the app. Set in the dashboard only if running a custom facilitator
+      # (e.g. one that actually serves /discovery/resources). Never hardcode here.
+      - key: FACILITATOR_URL
+        sync: false
+      # --- OPTIONAL: testnet symbolic price (fallback only) -------------------
+      # Leave UNSET. Default 0.0 => testnet stays $0 (invariant intact). Set to a
+      # tiny test amount (e.g. 0.001) in the dashboard ONLY if the facilitator
+      # refuses a $0 authorization during the real E2E. TESTNET ONLY — has no
+      # effect on mainnet (guarded). Documented here for the founder; not enabled.
+      - key: TESTNET_SYMBOLIC_PRICE_USDC
+        sync: false

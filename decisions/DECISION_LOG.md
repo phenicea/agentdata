@@ -950,3 +950,163 @@ amount="0" (prix testnet $0), payTo=0x5E44…541A. Côté vendeur OK, sans clé.
 
 **Ouvert :** le facilitator x402.org accepte-t-il amount="0" ? Sinon → montant testnet symbolique + test-USDC (acheteur).
 Prochaine étape : harnais ACHETEUR (script local, clé en env du fondateur) pour dérouler 402→pay→verify+settle→200.
+
+## 2026-06-16 — MILESTONE — E2E x402 testnet VALIDÉ (402 → pay → serve)
+
+Le fondateur a déroulé l'E2E en local (serveur vendeur X402_ENABLED=true + acheteur scripts/e2e_buyer.py, clé en
+env local jamais partagée). Résultat : **402 → pay → 200 vérifié sur testnet**, JSON débloqué (token USDX, tier risk).
+
+**Question ouverte tranchée par le run réel :** le facilitator x402.org **testnet accepte un montant `$0`** (run lancé
+SANS TESTNET_SYMBOLIC_PRICE_USDC, paiement à 0, settle OK). → Pas besoin de test-USDC ; le repli symbolique reste
+disponible mais non requis. Le tx hash n'est pas renvoyé par le facilitator (flux OK quand même).
+
+**Conséquence :** la couche paiement x402 est prouvée de bout en bout (testnet). Le **prérequis du listing #2 (Bazaar)
+est levé**. Mainnet toujours verrouillé (double garde). Listing #1 (Render, payments-OFF) inchangé.
+
+## 2026-06-16 — CEO — Topologie Bazaar (listing #2) + séquencement vs listing #1
+
+**Décision :**
+
+**1. Topologie pour le Bazaar = Option A (2e instance Render gratuite dédiée 402/Bazaar), MAIS conditionnée
+à une vérif doc live, et seulement APRÈS avoir armé le listing #1. Ordre de préférence tranché : A > C > B.**
+- **(B) Activer x402 sur l'instance existante = REJETÉ.** Cela sacrifierait le « endpoint data sans 402 » du
+  listing #1 alors que son compteur 3 j d'uptime court en ce moment. On ne casse jamais un actif qui tourne
+  pour en démarrer un autre, surtout quand l'isolation est gratuite. (Cf. décision E2E du 16/06 : « jamais sur
+  le service du listing #1 ».)
+- **(C) Attendre / tout séquentiel = REJETÉ comme posture par défaut.** Le listing #1 et le Bazaar n'ont
+  **aucune dépendance technique mutuelle** une fois l'E2E validé (il l'est). Attendre la fin complète du
+  listing #1 pour seulement *commencer* à préparer le Bazaar laisse du temps de découvrabilité sur la table
+  pour rien. On prépare le Bazaar **en parallèle** ; on l'**active** au bon moment (voir §2).
+- **(A) 2e instance Render gratuite `agentdata-pay` (ou nom équivalent) avec `X402_ENABLED=true` +
+  `PAY_TO_ADDRESS=0x5E44…`, `NETWORK_MODE=testnet`, payments-actifs, dédiée au 402 public + opt-in Bazaar =
+  RETENU** — **MAIS uniquement si la doc live confirme que le Bazaar exige une URL publique renvoyant un 402**
+  (point à lever par cto-agent, cf. §3). Même code, même repo, même adresse publique ; seul un flag de config
+  diffère entre les deux services. L'instance #1 reste strictement payments-OFF.
+- **Si la doc live montre que le Bazaar ne requiert PAS d'URL 402 publique** (opt-in déclaratif côté facilitator
+  + ressources déclarées suffisent), alors **on n'a même pas besoin de la 2e instance** : on déclare l'opt-in
+  par la voie supportée et on évite d'opérer un 2e service. Dans ce cas A se réduit à « rien à déployer », ce
+  qui est encore mieux (moins de surface à maintenir). **C'est pourquoi A est conditionné à la vérif §3 :
+  on ne déploie une 2e instance que si elle est réellement nécessaire.**
+
+**2. Séquencement / chemin critique vers « être listé ET choisi » :**
+- **Chemin critique = listing #1 (MCP Registry).** Inchangé, prioritaire : laisser courir les **3 j d'uptime
+  testnet sans régression de schéma** sur l'instance Render existante (payments-OFF), puis `mcp-publisher
+  publish`. C'est le listing à plus fort effet-historique et il n'exige ni 402 réglé ni mainnet. Rien ne doit
+  le perturber.
+- **Le Bazaar (listing #2) se prépare EN PARALLÈLE, s'active APRÈS le feu vert du listing #1.** Préparation
+  (vérif doc live §3 + code d'opt-in/extension bazaar + éventuelle config de la 2e instance) = **maintenant,
+  en fond**, sans toucher l'instance #1. Activation (déploiement de la 2e instance si requise + opt-in effectif)
+  = **une fois le listing #1 publié** (ou au minimum une fois les 3 j d'uptime atteints), pour ne pas diviser
+  l'attention ni risquer une manip sur l'instance #1 pendant que son compteur court.
+- **Pourquoi cet ordre et pas l'inverse :** au marché actuel (CLAUDE.md §4), la découvrabilité native MCP
+  (Claude et clients MCP) a un public concret aujourd'hui ; le Bazaar est la découverte native x402, à plus
+  faible volume actuel mais stratégiquement « être partout ». Le premier débloque de l'historique de fiabilité
+  immédiatement et gratuitement ; le second est un ajout de surface. On fait le plus fort effet d'abord, le
+  second en recouvrement.
+
+**3. Vérifs doc live AVANT de coder le Bazaar (cto-agent, ne pas deviner — CLAUDE.md §0) :**
+- Forme exacte de l'extension « bazaar » sur la `RouteConfig` x402 (SDK 2.13) : nom du champ/flag, structure
+  des métadonnées de ressource déclarées (l'agent doit voir prix/réseau/schéma).
+- Endpoint `/discovery/resources` du facilitator : qui l'expose (notre service ? le facilitator ?), forme de
+  la réponse, et **si l'auto-référencement Bazaar exige que notre endpoint serve publiquement un 402** ou si
+  l'opt-in déclaratif suffit. **C'est CE point qui détermine si la 2e instance Render est nécessaire** (§1).
+- Source : `docs.x402.org/extensions/bazaar`. Confirmer, ne pas extrapoler du journal.
+
+**Pourquoi :**
+- Mandat CEO : tout est **gratuit, testnet, réversible** (free tier, même code, adresse publique uniquement) →
+  dans mon périmètre, aucune escalade argent — **sauf** la création de la 2e instance Render par le fondateur
+  (action de compte, pas une dépense), et seulement si la vérif §3 la rend nécessaire.
+- North Star (CLAUDE.md §4, §9 « sois partout ») : être listé partout sans se disperser. On isole les deux
+  listings pour qu'aucun ne mette l'autre en risque, et on séquence par effet décroissant + dépendance.
+- Cohérence avec l'acté : la décision E2E du 16/06 disait déjà « si Bazaar exige une URL publique 402, NE PAS
+  l'activer sur le service du listing #1 → instance dédiée, décision CEO séparée ». La voici tranchée : oui à
+  l'instance dédiée si (et seulement si) requise, jamais sur l'instance #1.
+
+**Hypothèses & risques :**
+- Hypothèse : Render permet une **2e Web Service gratuite** sous le même compte sans CB. Si le free tier est
+  limité à un seul service actif / impose une CB pour le second → fallback : (a) déclarer l'opt-in Bazaar sans
+  2e service si la doc le permet, sinon (b) **escalade humain** pour un petit plan payant (cohérent avec la
+  bascule déjà prévue). On tente le gratuit d'abord.
+- Risque : opérer 2 services double la surface d'uptime à surveiller. Mitigé : keep-alive gratuit sur les deux
+  `/health`, monitoring déjà en place ; l'instance #2 n'est pas sur le chemin critique du listing #1.
+- Risque : divergence de config entre les deux instances (l'une OFF, l'autre ON). Mitigé : un seul repo, un
+  seul code, la seule différence est `X402_ENABLED` (+ pas d'`ALLOW_MAINNET` nulle part). Mainnet verrouillé
+  des deux côtés (double garde inchangée).
+- Risque : si on déploie la 2e instance avant la vérif §3 et qu'elle s'avère inutile → surface gaspillée.
+  Mitigé : §1 ordonne explicitement de **ne déployer la 2e instance qu'après confirmation qu'elle est requise**.
+
+**Succès mesuré par :**
+- **Listing #1 (prioritaire, inchangé) :** instance Render existante payments-OFF, `/v1/liquidity/exit-cost`
+  → 200 (pas 402), compteur 3 j d'uptime sans régression atteint → `mcp-publisher publish` exécuté.
+- **Vérif §3 levée :** statut « Bazaar exige-t-il une URL publique 402 ? oui/non » documenté au journal, avec
+  la forme exacte de l'extension bazaar et de `/discovery/resources`.
+- **Listing #2 (Bazaar) :** apparition de notre ressource dans le catalogue Bazaar via `/discovery/resources`
+  (testnet), opt-in effectif, **sans** que l'instance #1 ait jamais quitté l'état payments-OFF.
+
+**Handoff :** voir bloc Handoff CTO ci-dessous + demande au fondateur.
+
+## 2026-06-16 — CEO — Handoff → cto-agent (préparer le Bazaar, instance #1 protégée)
+
+À traiter par `cto-agent` (le « comment »). **Aucune touche mainnet, aucune dépense, testnet only. NE JAMAIS
+activer x402 sur l'instance Render du listing #1 (elle reste `X402_ENABLED=false`, compteur 3 j en cours).**
+
+**A. Lever le point bloquant en DOC LIVE (à faire EN PREMIER, avant tout code Bazaar) :**
+1. Sur `docs.x402.org/extensions/bazaar` (+ introspection SDK x402 2.13) : confirmer **(a)** la forme exacte de
+   l'extension « bazaar » sur la `RouteConfig` (champ/flag, métadonnées de ressource : prix par tier, réseau
+   `eip155:84532`, token USDC testnet, schéma) ; **(b)** le rôle/forme de `/discovery/resources` du facilitator ;
+   **(c) LE point décisif : le Bazaar exige-t-il que notre endpoint serve publiquement un 402, ou l'opt-in
+   déclaratif suffit-il ?** Remonter la réponse au CEO — c'est elle qui décide si on déploie une 2e instance.
+
+**B. Préparer le code d'opt-in Bazaar (sans déployer la 2e instance pour l'instant) :**
+2. Implémenter l'extension bazaar sur la `RouteConfig` selon la forme confirmée en A, avec les métadonnées de
+   ressource répliquées depuis la **table de prix unique** (`api/pricing.py`) — pas de divergence. Garder ça
+   derrière le flag `X402_ENABLED` (donc inactif sur l'instance #1, actif seulement là où x402 est ON).
+3. Si l'implémentation touche `pricing_402.py`/la table de prix : intégrer au passage **F-2** (invariant
+   testnet/mainnet sur `payment_requirements()` + check extra `x402[evm]`) et **F-3** (centraliser
+   `MAX_TIMEOUT_SECONDS`) — coût marginal nul (décision séquencement 16/06).
+
+**C. Si (et seulement si) A.(c) montre qu'une URL publique 402 est requise → préparer la 2e instance :**
+4. Préparer la config de déploiement d'une **2e Web Service Render gratuite** (`agentdata-pay` ou équivalent),
+   **même repo/même code**, variables : `X402_ENABLED=true`, `NETWORK_MODE=testnet`,
+   `PAY_TO_ADDRESS=0x5E442c144687De1D311855d65E87584BdEe7541A`, `FACILITATOR_URL` vide (→ défaut testnet),
+   `POOL_SOURCE=fixture`, **pas d'`ALLOW_MAINNET`**. Brancher un keep-alive gratuit sur son `/health`.
+   **Ne PAS la créer/déployer toi-même** : fournir le `render.yaml`/instructions au fondateur (création de
+   service = action de compte côté fondateur).
+5. Une fois la 2e instance live (par le fondateur) : y brancher l'URL publique dans la config Bazaar / l'opt-in,
+   vérifier que `GET /v1/liquidity/exit-cost` y renvoie un **402 bien formé** publiquement, et que la ressource
+   apparaît via `/discovery/resources`. **Capturer la preuve** (402 public + entrée discovery) au journal.
+
+**D. Séquencement d'activation (respecter l'ordre CEO) :**
+6. La **préparation** (A, B, et C-config) se fait **maintenant, en parallèle**, sans toucher l'instance #1.
+   L'**activation** du Bazaar (déploiement effectif de la 2e instance + opt-in live) se fait **après** le feu
+   vert du listing #1 (3 j uptime atteints / `mcp-publisher publish`), pour ne pas diviser l'attention pendant
+   que le compteur du listing #1 court.
+
+**E. Escalades / limites (ne PAS décider ni exécuter côté agent) :**
+- **Mainnet / vrai USDC / activation x402 sur l'instance #1** : interdit. Mainnet verrouillé (double garde).
+- **Plan Render payant** : seulement si le free tier refuse une 2e instance → escalade humain.
+- **Clé privée** : jamais côté agent (l'instance vendeur n'a besoin que de l'adresse publique `0x5E44…`).
+
+**Demande au FONDATEUR (le cas échéant) :**
+- **Conditionnelle** — seulement si cto-agent confirme (point A.c) qu'une **URL publique 402 est requise** pour
+  le Bazaar : **créer une 2e Web Service Render gratuite** (`agentdata-pay`) depuis le même repo, avec les
+  variables fournies par cto-agent (`X402_ENABLED=true`, testnet, `PAY_TO_ADDRESS=0x5E44…`). C'est une **action
+  de compte gratuite** (free tier, pas de CB attendue) — **pas une dépense**. Si Render impose une CB pour un
+  2e service, **ne rien payer sans validation** : remonter au CEO (escalade plan payant).
+- **Inconditionnel :** continuer à laisser courir les **3 j d'uptime** sur l'instance #1 (payments-OFF) — c'est
+  le chemin critique. Ne pas y toucher.
+- Rappel : tout reste **testnet** — pas de vrai USDC, pas de mainnet.
+
+## 2026-06-16 — CTO (doc live) — Mécanique du Bazaar (listing #2)
+
+Vérifié sur docs.x402.org/extensions/bazaar :
+- Extension déclarative : `extensions.bazaar.info` (input/output schemas) sur la RouteConfig + serviceName/tags/iconUrl optionnels.
+- `/discovery/resources` servi par le **facilitator** (liste les services « enregistrés via ce facilitator »).
+- **Non confirmé par la doc** : si un endpoint public renvoyant un 402 en live est requis, et le mécanisme exact
+  d'enregistrement auprès du facilitator. Trou de spec — ne pas deviner.
+- Inférence (à confirmer empiriquement) : découverte = via facilitator ; notre E2E était en localhost (inatteignable
+  par le facilitator) → il faut probablement un endpoint **public, payments-ON**, interagissant avec x402.org →
+  **2e instance Render (option A CEO)**. Décision finale d'instance après confirmation.
+
+**Statut listing #2 :** prêt à préparer (extension bazaar codable derrière X402_ENABLED, inactive sur listing #1) ;
+activation après le feu vert du listing #1 (chemin critique = 3 j uptime + publish MCP Registry).
