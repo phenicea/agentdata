@@ -25,7 +25,7 @@ flipped (an escalated, reviewed decision).
 
 from __future__ import annotations
 
-from agentdata.api.pricing import price_string
+from agentdata.api.pricing import price_string_for_settings
 from agentdata.compute.tiers import Tier
 from agentdata.config import Settings
 
@@ -44,7 +44,10 @@ def payment_requirements(tier: Tier, settings: Settings) -> dict:
     (testnet => "$0"); the atomic ``amount`` and the USDC ``asset`` address are
     resolved by the EVM exact scheme per network, so neither is guessed here.
     """
-    price = price_string(tier, is_mainnet=settings.is_mainnet)
+    # Settings-aware: testnet => "$0" by default, or the OPT-IN symbolic amount
+    # (TESTNET_SYMBOLIC_PRICE_USDC) when set; mainnet => fixed price (symbolic
+    # never applies on mainnet — guarded in pricing.price_usdc).
+    price = price_string_for_settings(tier, settings)
     asset_amount = _resolve_asset_amount(price, settings.chain_id)
 
     return {

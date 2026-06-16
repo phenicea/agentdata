@@ -25,7 +25,7 @@ running the app without x402 installed — never breaks the app.
 
 from __future__ import annotations
 
-from agentdata.api.pricing import DEFAULT_TIER, price_string
+from agentdata.api.pricing import DEFAULT_TIER, price_string_for_settings
 from agentdata.compute.tiers import Tier
 from agentdata.config import Settings
 from agentdata.safety import guard_network
@@ -85,7 +85,6 @@ def build_x402_middleware(app, settings: Settings):
     from x402.server import x402ResourceServer
 
     network = settings.chain_id  # CAIP-2, e.g. "eip155:84532" (Base Sepolia)
-    is_mainnet = settings.is_mainnet
 
     # --- per-request price: read the tier, price from the single source -----
     def tier_price(ctx: HTTPRequestContext) -> str:
@@ -98,8 +97,10 @@ def build_x402_middleware(app, settings: Settings):
             tier = _tier_from_query(raw_tier if isinstance(raw_tier, str) else None)
         except Exception:
             tier = DEFAULT_TIER
-        # "$0" on testnet, "$0.008/$0.02/$0.04" on mainnet — single source.
-        return price_string(tier, is_mainnet=is_mainnet)
+        # "$0" on testnet by default ($0.008/$0.02/$0.04 on mainnet) — single
+        # source. Settings-aware so the OPT-IN testnet symbolic amount
+        # (TESTNET_SYMBOLIC_PRICE_USDC) reaches the on-the-wire 402 when set.
+        return price_string_for_settings(tier, settings)
 
     # --- facilitator + resource server with the EVM "exact" scheme ----------
     facilitator = HTTPFacilitatorClient(FacilitatorConfig(url=settings.facilitator_url))

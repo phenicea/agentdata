@@ -20,7 +20,7 @@ from agentdata.config import load_settings
 from agentdata.monitoring import METRICS
 from agentdata.safety import guard_network
 
-from .pricing import DEFAULT_TIER, pricing_table
+from .pricing import DEFAULT_TIER, pricing_table_for_settings
 from .schemas import ExitCostResponse
 
 # Discovery artifacts (llms.txt, docs/api.md) live at the repo root. We resolve
@@ -97,7 +97,9 @@ def metrics() -> dict:
 
 @app.get("/pricing", tags=["discovery"])
 def pricing() -> dict:
-    return pricing_table(is_mainnet=load_settings().is_mainnet)
+    # Settings-aware: reflects the OPT-IN testnet symbolic amount when set,
+    # otherwise $0 on testnet (listing #1 invariant). Single source of truth.
+    return pricing_table_for_settings(load_settings())
 
 
 @app.get("/llms.txt", response_class=PlainTextResponse, tags=["discovery"])

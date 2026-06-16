@@ -766,3 +766,187 @@ Le fondateur a créé l'org GitHub `phenicea` ; l'agent y est admin. Décision C
   name `@phenicea/...` + mcpName, test_deploy, contact OpenAPI ; grep `0xcssh` vide hors journal). remote git mis à jour.
 - 103 tests verts, commit + push sur phenicea. `remotes[0].url` toujours placeholder Render.
 - Plus aucune migration de namespace à prévoir : publication future directement sous phenicea (un seul listing).
+
+## 2026-06-16 — BUILD — Service LIVE sur Render (testnet) + URL branchée
+
+Déployé et **vérifié en prod** : https://agentdata-liquidity-exit-cost.onrender.com
+- `/health` 200 (testnet), `/pricing` 200 ($0), `/v1/liquidity/exit-cost` 200, `/llms.txt` 200 (text/plain),
+  `/docs/api.md` 200, `/openapi.json` 200 (champ `servers` présent), handshake MCP `/mcp/ initialize` 200.
+- Correctif prod appliqué : résolution robuste des artifacts (llms.txt/docs via fallback CWD) car install
+  non-editable ne copie pas les fichiers repo-root dans site-packages. URL réelle branchée dans server.json
+  (remote `…/mcp`), OpenAPI `servers[]`, llms.txt (liens absolus).
+- `autoDeploy: true` activé (push → déploiement auto ; à appliquer via un resync Blueprint).
+
+**Reste pour listing #1 :** keep-alive `/health` (~5-10 min, free tier dort à 15 min) → 3 j d'uptime → `mcp-publisher
+login github` (org phenicea) + publish. npm `@phenicea` optionnel. E2E testnet (option C) attend le wallet Sepolia.
+
+## 2026-06-16 — CEO — E2E 402 en LOCAL (Option A), Render reste payments-OFF pour le listing #1
+
+> **Fait nouveau :** le fondateur a fourni l'**adresse PUBLIQUE** de wallet Base Sepolia
+> **`0x5E442c144687De1D311855d65E87584BdEe7541A`**, financée ~0,1 testnet ETH (gas). Pas de clé privée
+> partagée (correct, CLAUDE.md §14 — la clé reste locale, jamais en chat/repo). Cette adresse devient le
+> **`PAY_TO_ADDRESS` du projet** (côté VENDEUR). Toujours **testnet** (Base Sepolia `eip155:84532`),
+> mainnet verrouillé.
+
+**Décision :**
+
+**1. Où valider l'E2E 402 = Option A — EN LOCAL. (Recommandée. B = activer x402 sur Render : REJETÉE. C = 2e instance Render : REJETÉE pour l'instant.)**
+- L'E2E 402 → pay → serve se valide **en local** : `X402_ENABLED=true` + `NETWORK_MODE=testnet` +
+  `PAY_TO_ADDRESS=0x5E44…` côté serveur (lancé localement par l'agent/le fondateur), facilitator testnet
+  `x402.org`. Le fondateur joue l'**acheteur** avec sa clé privée en **env local uniquement** (jamais en
+  chat/repo) et signe le paiement testnet.
+- **Le service Render LIVE reste `X402_ENABLED=false`** (payments OFF) — inchangé. Le listing #1 (MCP
+  Registry) n'exige PAS le 402 ; activer x402 sur Render renverrait un 402 à toute requête
+  `/v1/liquidity/exit-cost`, ce qui **casse l'attente « endpoint data sans paiement »** du listing #1 ET
+  **perturbe le compteur d'uptime/découvrabilité en cours** (le keep-alive ping `/health`, mais un agent qui
+  teste `/v1/liquidity/exit-cost` tomberait sur un 402 inattendu → signal de fiabilité dégradé).
+- **B rejetée** : sacrifier le « no-402 » du listing #1 pour valider un flux qui se valide aussi bien en
+  local = mauvais arbitrage (on casse l'actif qui court — l'uptime/découvrabilité — pour zéro gain qu'on ne
+  puisse obtenir en local).
+- **C rejetée pour l'instant** : une 2e instance Render dédiée paiements ajoute coût/complexité (et un 2e
+  service free-tier qui dort + un 2e keep-alive) pour une validation qui n'a pas besoin d'être publique. On
+  ne déploie une instance « démo paiements » publique QUE si, plus tard, un canal (BlockRun, ou une démo
+  Bazaar) exige une URL 402 live montrable — à ce moment-là, ce sera une décision séparée (et toute version
+  always-on payante = escalade humain).
+
+**2. Ordre vs listing #1 = on NE casse PAS le chemin critique. Le compteur 3 j (payments OFF) reste prioritaire ; l'E2E 402 se fait EN PARALLÈLE en local.**
+- Le **compteur d'uptime 3 j** (listing #1, Render payments-OFF) continue **sans interruption** — c'est
+  l'actif qui court dans le temps réel et qu'on ne peut pas rattraper (North Star CLAUDE.md §4 : fiabilité +
+  découvrabilité d'abord). On ne touche à rien sur Render.
+- L'**E2E 402 local** avance **en fond**, sans bloquer ni perturber le listing #1. Il débloque le **listing
+  #2 (Bazaar)**, qui exige le flux 402 validé end-to-end testnet (décision listing du 16/06). Les deux
+  pistes sont indépendantes : listing #1 ne dépend pas du 402, listing #2 en dépend.
+
+**3. Périmètre d'E2E « suffisant » pour débloquer le listing #2 Bazaar :**
+- **Minimum requis (gate listing #2) :** au moins **une transaction testnet complète** où :
+  (a) le serveur émet un **402 bien formé** (termes corrects : montant par tier, réseau Base Sepolia
+  `eip155:84532`, token USDC testnet, `pay_to` = `0x5E44…`, scheme EVM `exact`) ;
+  (b) l'acheteur **signe et paie** sur Base Sepolia ;
+  (c) le serveur **vérifie ET settle** la preuve via le facilitator testnet (verify→settle OK) ;
+  (d) puis **sert le JSON** exit-cost (200) — le tout au moins **une fois de bout en bout**, prouvé par un
+  hash de tx testnet + la réponse servie.
+- **Idéalement (non bloquant pour Bazaar mais à faire si peu de coût) :** rejouer pour ≥ 2 tiers (au moins
+  `risk` défaut + un autre) pour prouver que **le montant du 402 dépend bien du tier** ; et un cas négatif
+  (preuve invalide/rejouée → 402, body non servi) pour prouver le fail-closed. Ces deux derniers points
+  recoupent les findings hardening F-4 (anti-rejeu) — bonus, pas un prérequis Bazaar.
+- **Point ouvert à trancher pendant l'E2E (doc live, déjà noté Phase 2) :** le facilitator testnet
+  accepte-t-il un montant **$0** pour verify/settle ? **Si NON**, fixer un **montant testnet symbolique non
+  nul** (USDC de test, jamais de vrai USDC) via config pour valider la vérification → cela peut exiger que le
+  fondateur détienne du **test-USDC Base Sepolia** (pas seulement du gas ETH). À déterminer empiriquement au
+  premier run ; documenter le résultat dans ce journal.
+
+**Pourquoi :**
+- **On protège l'actif qui court (uptime/découvrabilité) sans rien sacrifier.** L'Option A valide exactement
+  le même flux que B/C mais en local, donc casser le listing #1 (B) ou payer une 2e instance (C) serait du
+  coût/risque pur pour zéro information supplémentaire. Le flux 402 est identique local vs déployé (même code,
+  même facilitator testnet, même adresse `pay_to`).
+- **Conforme au mandat CEO et aux valeurs** : tout est gratuit, testnet, réversible ; aucune dépense, aucun
+  mainnet, aucun vrai USDC. La clé privée reste locale chez le fondateur (CLAUDE.md §14) — l'agent n'exécute
+  QUE le côté vendeur (qui n'a besoin que de l'adresse publique) et la préparation/instructions du côté
+  acheteur, **jamais** la clé.
+- **Séquencement honnête** : listing #1 (le plus fort effet-historique, n'exige pas le 402) reste sur le
+  chemin critique ; listing #2 (Bazaar) suit dès l'E2E validé, sans que l'un ralentisse l'autre.
+
+**Hypothèses & risques :**
+- Hypothèse : le facilitator testnet `x402.org` accepte `$0` → si NON, fallback = montant testnet symbolique
+  + test-USDC requis côté fondateur (ask P-USDC ci-dessous). Risque faible, juste un détour de config.
+- Risque : divergence local vs prod. Le code est le même (un seul `app`/`asgi`), seul `X402_ENABLED` diffère →
+  ce qui marche en local avec x402=true marchera sur Render si un jour on l'active. Mitigé : on teste le
+  **vrai** facilitator testnet, pas un mock, donc l'E2E est représentatif.
+- Risque : pour le listing #2 Bazaar, il faudra que l'endpoint de discovery / l'extension bazaar soit
+  joignable — à vérifier si Bazaar exige une **URL publique** 402-active pour s'auto-référencer, ou si la
+  validation E2E locale + l'opt-in déclaratif suffisent. **Si Bazaar exige une URL publique qui renvoie un
+  402**, alors et seulement alors C (instance dédiée paiements) ou une bascule contrôlée redeviennent sur la
+  table → décision séparée à ce moment (et toujours sans casser le listing #1 : instance distincte, pas le
+  service du listing #1). À lever par cto-agent en doc live avant de conclure Bazaar.
+- Risque clé privée : aucune clé ne doit transiter par l'agent/chat/repo. Garde-fou : l'agent fournit des
+  **instructions** au fondateur pour l'étape acheteur ; la clé reste en env local chez lui.
+
+**Succès mesuré par :**
+- **Listing #1 (inchangé, prioritaire) :** Render reste payments-OFF, `/v1/liquidity/exit-cost` renvoie 200
+  (pas 402), compteur 3 j d'uptime sans régression de schéma continue de courir. Aucune perturbation.
+- **E2E 402 (gate listing #2) :** au moins **1 transaction testnet** prouvée 402→pay→verify→settle→serve
+  (hash tx Base Sepolia + réponse JSON servie), `pay_to` = `0x5E44…`. Idéalement 2 tiers + 1 cas de rejet.
+- **Point ouvert tranché :** statut « facilitator accepte $0 ? » documenté (oui → rien à faire ; non →
+  montant symbolique + test-USDC), consigné au journal.
+- **Listing #2 débloqué :** une fois l'E2E validé, prérequis Bazaar atteint (sous réserve du point « URL
+  publique requise ? » à lever).
+
+**Handoff :** voir blocs ci-dessous (cto-agent : partie agent sans clé privée ; fondateur : clé en local + test-USDC éventuel).
+
+## 2026-06-16 — CEO — Handoff → cto-agent (E2E 402 LOCAL, partie agent, SANS clé privée)
+
+À traiter par `cto-agent` (le « comment »). **Aucune touche mainnet, aucune dépense, testnet only. L'agent n'exécute QUE le côté vendeur + la préparation du côté acheteur — la clé privée du fondateur ne transite JAMAIS par l'agent/chat/repo (CLAUDE.md §14).**
+
+**A. NE PAS toucher le service Render (listing #1 protégé) :**
+1. Render reste `X402_ENABLED=false`, `NETWORK_MODE=testnet`. Ne PAS activer x402 en prod, ne pas redeployer
+   pour les paiements. Le compteur 3 j d'uptime continue de courir sans interruption.
+
+**B. Lancer le serveur VENDEUR en LOCAL avec x402 activé (testnet) :**
+2. En local (`.env` local non committé) : `NETWORK_MODE=testnet`, `X402_ENABLED=true`,
+   `PAY_TO_ADDRESS=0x5E442c144687De1D311855d65E87584BdEe7541A`, `FACILITATOR_URL` vide (→ défaut testnet
+   `https://x402.org/facilitator`), `POOL_SOURCE=fixture`. `ALLOW_MAINNET` absent. Lancer `agentdata.asgi:app`
+   localement (uvicorn) et vérifier qu'une requête `/v1/liquidity/exit-cost?...&tier=risk` renvoie bien un
+   **402 bien formé** (montant du tier, réseau `eip155:84532`, token USDC testnet, `pay_to`=`0x5E44…`, scheme
+   `exact`). C'est la moitié vendeur — **aucune clé privée requise** (l'adresse publique suffit).
+3. **Reconfirmer en doc live** (CLAUDE.md §0, ne pas déduire du journal) : la forme exacte des termes 402 du
+   SDK x402 2.13 ; et surtout **si le facilitator testnet accepte un montant `$0`** pour verify/settle.
+   - Si **$0 accepté** : l'E2E se fait à montant nul, le fondateur n'a besoin que de gas ETH (déjà fourni).
+   - Si **$0 refusé** : fixer un **montant testnet symbolique non nul** via config (USDC de test, jamais de
+     vrai USDC), strictement séparé du prix mainnet (invariant testnet/mainnet intact). Cela déclenche l'ask
+     **test-USDC** au fondateur (côté acheteur). Documenter le choix.
+   - Profiter de ce passage (si on touche `pricing_402.py`) pour intégrer **F-2** (invariant testnet/mainnet
+     sur `payment_requirements()` + check extra `x402[evm]`) et **F-3** (centraliser `MAX_TIMEOUT_SECONDS`) —
+     coût marginal nul (décision séquencement du 16/06).
+
+**C. Préparer (sans exécuter) le côté ACHETEUR pour le fondateur :**
+4. Fournir au fondateur des **instructions/un script local** pour jouer l'acheteur : un client x402 testnet
+   (CLI/script) qui lit le 402, signe le paiement avec **sa** clé (en **env local chez lui**, ex.
+   `PRIVATE_KEY=…` jamais committé/jamais en chat), paie sur Base Sepolia, rejoue la requête avec la preuve.
+   L'agent **écrit le script et le doc**, mais **n'exécute pas** l'étape qui consomme la clé. Le script doit
+   lire la clé depuis l'env local, jamais d'un argument en clair ni d'un fichier committé.
+
+**D. Exécuter l'E2E + capturer la preuve :**
+5. Avec le fondateur jouant l'acheteur en local : dérouler 402 → pay → verify → settle → serve **au moins une
+   fois** (tier `risk` par défaut). Capturer : le **hash de tx testnet** Base Sepolia, le 402 émis, et la
+   **réponse JSON 200** servie après paiement. Idéalement rejouer pour un 2e tier (prouver montant ∝ tier) et
+   un **cas de rejet** (preuve invalide/rejouée → 402, body non servi — recoupe F-4).
+6. **Consigner le résultat** dans ce journal (entrée BUILD) : statut « facilitator $0 oui/non », hash(es) de
+   tx, tiers couverts, et tout écart. NE PAS committer de clé, de `.env` réel, ni de log contenant une clé.
+
+**E. Lever le point bloquant Bazaar (avant de conclure listing #2) :**
+7. En **doc live** (`docs.x402.org/extensions/bazaar`, `/discovery/resources` du facilitator) : déterminer si
+   Bazaar exige une **URL publique renvoyant un 402** pour l'auto-référencement, ou si l'E2E validé + l'opt-in
+   déclaratif suffisent. **Remonter le résultat au CEO** : si une URL publique 402-active est requise, NE PAS
+   l'activer sur le service du listing #1 — ce sera une décision CEO séparée (probablement une instance/route
+   dédiée paiements, ou une bascule contrôlée), pour ne jamais casser le listing #1.
+
+**F. Escalades / limites (ne PAS décider ni exécuter côté agent) :**
+- **Clé privée acheteur** : exécution LOCALE par le fondateur uniquement. L'agent ne la voit pas, ne la
+  stocke pas, ne l'exécute pas.
+- **Test-USDC Base Sepolia** : seulement si le facilitator refuse `$0` → ask fondateur (faucet test-USDC).
+- **Mainnet / vrai USDC / activation x402 en prod sur le service du listing #1** : escalade / décision CEO
+  séparée. Mainnet verrouillé (double garde inchangée).
+- **Instance Render dédiée paiements (Option C)** : seulement si Bazaar (ou un autre canal) exige une URL
+  publique 402 — décision CEO séparée, jamais sur le service du listing #1.
+
+**Demandes au FONDATEUR (côté acheteur, local) :**
+- **Garder la clé privée du wallet `0x5E44…` en LOCAL** (env local, ex. `PRIVATE_KEY`), **jamais** en chat ni
+  committée. Lancer l'étape acheteur de l'E2E avec le script fourni par cto-agent quand prêt.
+- **Test-USDC Base Sepolia** : à récupérer via un faucet **seulement si** le premier run montre que le
+  facilitator testnet refuse un montant `$0` (cto-agent confirmera après B3). Le gas ETH (~0,1) déjà fourni
+  couvre la signature/tx ; l'USDC de test ne sert que si un montant symbolique non nul est imposé.
+- Rappel : tout ceci reste **testnet** — pas de vrai USDC, pas de mainnet.
+
+## 2026-06-16 — BUILD — E2E côté VENDEUR validé en local (402 bien formé)
+
+PAY_TO_ADDRESS du projet (testnet) = `0x5E442c144687De1D311855d65E87584BdEe7541A` (Base Sepolia, adresse publique ;
+clé privée jamais en chat/repo). Décision CEO : E2E en LOCAL (Option A), Render reste payments-OFF (listing #1 protégé).
+
+Vérifié en local (X402_ENABLED=true, NETWORK_MODE=testnet, PAY_TO_ADDRESS=0x5E44…) : `GET /v1/liquidity/exit-cost`
+renvoie **HTTP 402 bien formé**, défi dans l'en-tête `payment-required` (base64) :
+scheme=exact, network=eip155:84532, asset=0x036CbD…CF7e (**USDC testnet Base Sepolia, auto-résolu**),
+amount="0" (prix testnet $0), payTo=0x5E44…541A. Côté vendeur OK, sans clé.
+
+**Ouvert :** le facilitator x402.org accepte-t-il amount="0" ? Sinon → montant testnet symbolique + test-USDC (acheteur).
+Prochaine étape : harnais ACHETEUR (script local, clé en env du fondateur) pour dérouler 402→pay→verify+settle→200.

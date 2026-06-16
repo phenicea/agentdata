@@ -43,6 +43,23 @@ FACILITATOR_URL = {
 _TRUTHY = {"true", "1", "yes", "on"}
 
 
+def _read_symbolic_price(raw: str | None) -> float:
+    """Parse ``TESTNET_SYMBOLIC_PRICE_USDC`` into a non-negative float.
+
+    Default (unset / empty) => ``0.0`` => behaviour identical to today (testnet
+    stays $0, listing #1 + the "testnet = $0" invariant untouched). A malformed or
+    negative value fails closed to ``0.0`` rather than silently pricing something
+    unexpected on the funds-adjacent path.
+    """
+    if not raw:
+        return 0.0
+    try:
+        value = float(raw)
+    except ValueError:
+        return 0.0
+    return value if value > 0.0 else 0.0
+
+
 @dataclass(frozen=True)
 class Settings:
     network_mode: NetworkMode
@@ -58,6 +75,13 @@ class Settings:
     # Default False => the app refuses to start on mainnet (ADR-001 §4 guardrail).
     # Flipping this is a reviewed human escalation (CLAUDE.md §0/§14), never accidental.
     allow_mainnet: bool = False
+    # OPT-IN, TESTNET-ONLY symbolic per-call price in USDC. Default 0.0 => testnet
+    # stays $0 (listing #1 default + the "testnet = $0" invariant intact). When set
+    # > 0 AND on testnet, price_usdc returns this symbolic amount so the founder can
+    # run the real E2E if the facilitator refuses a $0 (zero-value) authorization.
+    # NEVER has any effect on mainnet (guarded; see safety.guard_network). Recommended
+    # value: 0.001 ($0.001 = 1000 atomic units of Base Sepolia USDC, faucet-fundable).
+    testnet_symbolic_price_usdc: float = 0.0
 
     @property
     def is_mainnet(self) -> bool:
@@ -76,6 +100,9 @@ def load_settings() -> Settings:
         chain_id=CHAIN_ID[mode],
         x402_enabled=os.getenv("X402_ENABLED", "false").lower() in _TRUTHY,
         allow_mainnet=os.getenv("ALLOW_MAINNET", "false").lower() in _TRUTHY,
+        testnet_symbolic_price_usdc=_read_symbolic_price(
+            os.getenv("TESTNET_SYMBOLIC_PRICE_USDC")
+        ),
     )
     # Guard on EVERY load, not just at startup: endpoints re-read settings per
     # request, so a runtime NETWORK_MODE flip must fail closed here too (closes the
