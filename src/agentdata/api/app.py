@@ -84,7 +84,9 @@ app = FastAPI(
 )
 
 
-@app.get("/health", tags=["ops"])
+# GET + HEAD: uptime monitors (UptimeRobot, Render) probe with HEAD by default,
+# and FastAPI does not auto-map HEAD onto a GET route — without HEAD this 405s.
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["ops"])
 def health() -> dict:
     s = load_settings()
     return {"status": "ok", "network": s.network_mode.value, "pool_source": s.pool_source.value}
