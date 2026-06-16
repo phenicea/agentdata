@@ -44,7 +44,7 @@ Helper endpoints (no payment):
 ## MCP tool
 
 - Tool name: `liquidity_exit_cost`
-- Transport: streamable-http; remote MCP endpoint advertised at `<base_url>/mcp`.
+- Transport: streamable-http; remote MCP endpoint: `https://agentdata-liquidity-exit-cost.onrender.com/mcp`
 - Inputs: `token` (string, required), `size` (number > 0, required),
   `tier` (enum `quote`|`risk`|`deep`, default `risk`), `pool` (string, optional).
 - Output: same structured schema as the REST endpoint (REST/MCP parity is guaranteed —
@@ -68,9 +68,10 @@ the tier it needs.
 
 ## Docs
 
-- Full API docs (markdown, raw): /docs/api.md
-- OpenAPI: /openapi.json
-- Pricing (live JSON): /pricing
+- Base URL: https://agentdata-liquidity-exit-cost.onrender.com
+- Full API docs (markdown, raw): https://agentdata-liquidity-exit-cost.onrender.com/docs/api.md
+- OpenAPI: https://agentdata-liquidity-exit-cost.onrender.com/openapi.json
+- Pricing (live JSON): https://agentdata-liquidity-exit-cost.onrender.com/pricing
 - Strategy / decisions: CLAUDE.md, decisions/DECISION_LOG.md, decisions/adr/
 
 ## Notes for agents

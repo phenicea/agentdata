@@ -12,8 +12,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "_comment": "TODO: replace PLACEHOLDER-RENDER-HOST with the real Render Web Service host once deployed (human step). Final form: https://<render-host>/mcp",
-      "url": "https://PLACEHOLDER-RENDER-HOST/mcp"
+      "url": "https://agentdata-liquidity-exit-cost.onrender.com/mcp"
     }
   ]
 }

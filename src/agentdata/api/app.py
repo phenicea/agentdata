@@ -58,6 +58,12 @@ app = FastAPI(
         "url": "https://github.com/phenicea/agentdata",
     },
     license_info={"name": "MIT"},
+    servers=[
+        {
+            "url": "https://agentdata-liquidity-exit-cost.onrender.com",
+            "description": "Live testnet/preview deployment (Base Sepolia).",
+        }
+    ],
     openapi_tags=[
         {
             "name": "liquidity",
