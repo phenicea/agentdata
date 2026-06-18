@@ -1320,3 +1320,17 @@ Tout reste **testnet** ; mainnet verrouillé (double garde inchangée).
   (compte/org `phenicea`) puis `mcp-publisher publish` (runbook `docs/publish-mcp-registry.md`), libellé
   testnet/preview. C'est l'unique action humaine restante du listing #1. Reste testnet — **aucun** USDC réel,
   **aucune** bascule mainnet.
+
+## 2026-06-18 — MILESTONE 🚀 — Listing #1 LIVE sur le MCP Registry
+
+`mcp-publisher publish` réussi par le fondateur. **`io.github.phenicea/agentdata-liquidity-exit-cost` v0.1.0**
+est résolvable dans le registre (`count:1`), remote `https://agentdata-liquidity-exit-cost.onrender.com/mcp/`,
+description 88 car. Découvrable par tout client MCP. Premier canal de découverte ACTIF.
+
+Frictions résolues au publish : (1) description >100 car → raccourcie à 88 ; (2) JWT expiré → re-login ;
+(3) 403 namespace org → le fondateur a rendu son appartenance à l'org `phenicea` **publique** (le device-flow ne
+voyait que `io.github.0xcssh/*`), puis re-login → token couvrant `io.github.phenicea/*` → publish OK.
+
+Gate 72h levé par le CEO (preuve de stabilité ~46h + tout vert > proxy temporel). Tout reste testnet, mainnet
+verrouillé, instance #1 payments-OFF ($0). Prochains canaux : Bazaar (#2, attend /discovery/resources côté x402.org),
+BlockRun (#3, contact t.me/bc1max avec le kit docs). npm non requis (serveur remote).
