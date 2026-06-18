@@ -1237,3 +1237,86 @@ sourcé via QuoterV2 (extension planifiée, NON implémentée). Description Open
 `NOTES_RAILS.md` ; tests edge/erreurs + `chain/onchain.py` durci (ChainError clair sur RPC down/pool vide) ;
 dashboard `/dashboard` + `monitoring/logging_setup.py` ; landing `/` ; runbooks `docs/publish-mcp-registry.md` +
 `docs/publish-npm.md`. **175 tests verts** (vérif on-chain incluse), listing #1 intact (X402 off, $0, schéma inchangé).
+
+## 2026-06-18 — CEO — Gate uptime listing #1 : on PUBLIE MAINTENANT (~46h), gate 72h levé
+
+> **Supersède** le déclencheur « 3 jours (72h) d'uptime testnet sans régression de schéma » fixé dans
+> l'entrée du 2026-06-16 (« Ordre & stratégie de listing », critère #1 du listing MCP Registry) et repris
+> dans les Handoff CTO suivants. Le reste de cette entrée (libellé testnet/preview honnête, namespace
+> phenicea, instance #1 payments-OFF) reste inchangé.
+
+**Décision : publier le listing #1 (MCP Registry) MAINTENANT, à ~46h de stabilité démontrée, sans attendre
+les 72h.** Dès que les 3 vérifs pré-publication ci-dessous sont OK (toutes vérifiées en live ce jour, voir
+plus bas), le fondateur exécute `mcp-publisher login github` (org `phenicea`) + `mcp-publisher publish`.
+Tout reste **testnet** ; mainnet verrouillé (double garde inchangée).
+
+**Pourquoi :**
+- Le gate 72h n'était pas un seuil du registre — le MCP Registry **n'impose aucun minimum d'uptime**
+  (publication = `server.json` valide + OAuth GitHub, confirmé). C'était une **règle interne** que je m'étais
+  donnée pour une seule raison : la sélection des agents est mécanique sur la fiabilité (CLAUDE.md §10, §13) —
+  protéger la réputation naissante contre le scénario « listé puis down ».
+- Ce risque est **déjà couvert autrement** à 46h : (a) ~46h de stabilité continue effectivement démontrée
+  (UptimeRobot keep-alive actif), (b) incident 405 sur HEAD `/health` réglé, (c) E2E x402 testnet validé,
+  (d) exactitude AMM prouvée empiriquement (0,0000 bps vs `getAmountOut` on-chain réel). La barre 72h était
+  un **proxy** de « c'est stable » ; on a maintenant la **preuve directe** de stabilité. Tenir un proxy
+  arbitraire alors que la chose qu'il mesure est démontrée = optimiser un rituel, pas le risque réel.
+- North Star honnête (CLAUDE.md §4) : les premiers mois, la fonction-objectif est **être listé + fiable +
+  découvrable**, pas le revenu. L'**historique de fiabilité de l'entrée registre commence à courir au moment
+  du publish**, pas avant. Chaque jour d'attente = un jour d'historique de réputation perdu, sur un actif
+  (l'ancienneté/track-record de l'entrée) qu'on **ne peut pas rattraper plus tard**. `total_calls=0`
+  aujourd'hui est normal et ne change rien : on ne peut pas être *choisi* tant qu'on n'est pas *découvrable*.
+- Asymétrie du risque : si après publish le service flanchait, le listing reste **dépublia­ble/corrigeable**
+  (c'est du testnet/preview, libellé honnête, zéro USDC, zéro utilisateur lésé) — coût réputationnel réel
+  ~nul à ce stade sans trafic. À l'inverse, 26h d'attente supplémentaires ne nous apprennent **rien de
+  nouveau** (46h sans régression dit déjà l'essentiel) et coûtent du temps d'historique. Décision claire :
+  la vitesse de positionnement l'emporte, le garde-fou réputation est satisfait autrement.
+
+**Vérifs pré-publication — à confirmer juste avant `publish` (toutes OK en live ce 2026-06-18) :**
+1. `GET` ET `HEAD /health` → **200** (network=testnet, pool_source=fixture). ✅
+2. `GET /v1/liquidity/exit-cost?token=USDX&size=5000` → **200, PAS 402** (instance #1 reste payments-OFF) et
+   payload = schéma complet attendu (exit_cost / route / fragility / depeg), donnée **calculée** (USDX
+   ~4 bps + depeg≈0), pas un prix brut. ✅
+3. Handshake MCP **streamable-http → 200** et tous les liens de découverte 200 (`/llms.txt`, `/docs/api.md`,
+   `/openapi.json`, `/pricing` = $0). ✅ ; `server.json` : `name` === `package.json.mcpName` ===
+   `io.github.phenicea/...`, et `repository.url`/`websiteUrl` (`github.com/phenicea/agentdata`) résolvent
+   **200** (pas de 404 qui dégraderait la lecture par un agent). ✅
+
+**Deux frictions mineures relevées en live (NON bloquantes — à régler au passage, pas un report) :**
+- ⚠️ **`remotes[0].url` = `.../mcp` (sans slash final) renvoie 307** ; `.../mcp/` renvoie 200. Un client
+  streamable-http conforme suit le 307, mais un 307 dès le handshake est une aspérité inutile pour un
+  sélecteur mécanique. **Reco : faire pointer `remotes[0].url` sur `.../mcp/`** (ou rendre `/mcp` 200 sans
+  redirect) avant publish. Coût ~nul, supprime toute ambiguïté. → Handoff cto-agent.
+- ℹ️ **`/metrics.uptime_seconds` se réinitialise à chaque cold start** (éviction du process sur Render free
+  tier — observé 62 s). Donc le « 167536 s ≈46h » **ne vient pas du compteur in-process** mais bien du
+  moniteur externe (UptimeRobot) + cohérence des 200/schéma. C'est exactement la définition d'« uptime
+  applicatif » actée le 16/06 (décision Render). **Ne pas se fier au compteur in-process** comme preuve
+  d'uptime ; la preuve = moniteur externe + 200 cohérents + schéma stable. Sans incidence sur la décision.
+
+**Hypothèses & risques :**
+- Hypothèse : publier en **testnet/preview** avec libellé honnête ne nuit pas à la réputation tant que le
+  service répond et que le schéma est stable — conditions remplies. Risque résiduel (service down post-publish)
+  = couvert par keep-alive + dépublication possible + zéro trafic réel à léser.
+- Risque : friction 307 sur `/mcp` casse un client MCP strict. Faible (le protocole suit les redirects), mais
+  on l'élimine par la reco ci-dessus avant publish → risque ramené à ~0.
+- Risque : régression de schéma silencieuse entre maintenant et le publish. Mitigé : le publish suit
+  immédiatement les 3 vérifs ci-dessus ; les exécuter à T-0 du `publish`.
+
+**Succès mesuré par :**
+- **Publish atteint :** entrée `io.github.phenicea/agentdata-liquidity-exit-cost` présente et résolvable dans
+  le MCP Registry (remote streamable-http), `mcp-publisher publish` retourné OK.
+- **Pré-publish vert à T-0 :** les 3 vérifs ci-dessus = 200/schéma OK au moment exact du publish, `remotes`
+  pointant sur un endpoint MCP qui répond **200 directement** (pas via 307).
+- **Historique qui court :** à partir du publish, le track-record de fiabilité de l'entrée commence — c'est la
+  métrique qui compte au stade actuel (pas `total_calls`, encore à 0 et attendu tel quel).
+
+**Handoff :**
+- **cto-agent :** (1) faire pointer `remotes[0].url` de `server.json` sur `.../mcp/` (slash final) — ou rendre
+  `/mcp` 200 sans redirect — pour supprimer le 307 au handshake ; re-vérifier handshake 200 sur l'URL exacte
+  publiée. (2) Rejouer les 3 vérifs pré-publication ci-dessus juste avant le publish (200 + schéma stable +
+  liens 200 + `name===mcpName` + URLs repo 200). (3) Ne rien changer d'autre : instance #1 reste
+  `X402_ENABLED=false`, $0, mainnet verrouillé. Bazaar (listing #2) inchangé (toujours bloqué externe, en
+  veille hebdo).
+- **Fondateur :** une fois le slash corrigé et les vérifs vertes → exécuter `mcp-publisher login github`
+  (compte/org `phenicea`) puis `mcp-publisher publish` (runbook `docs/publish-mcp-registry.md`), libellé
+  testnet/preview. C'est l'unique action humaine restante du listing #1. Reste testnet — **aucun** USDC réel,
+  **aucune** bascule mainnet.

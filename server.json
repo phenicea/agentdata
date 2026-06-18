@@ -12,7 +12,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://agentdata-liquidity-exit-cost.onrender.com/mcp"
+      "url": "https://agentdata-liquidity-exit-cost.onrender.com/mcp/"
     }
   ]
 }
