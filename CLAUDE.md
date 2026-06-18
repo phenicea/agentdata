@@ -1,8 +1,12 @@
-# CLAUDE.md — Endpoint d'intelligence crypto/DeFi pour agents IA (x402)
+# CLAUDE.md — Phenicea : endpoint d'intelligence crypto/DeFi pour agents IA (x402)
 
 > Document de contexte et de pilotage pour l'agent de développement (Claude Code).
-> Nom de travail du projet : **AgentData** (à renommer librement).
+> Nom du projet : **Phenicea** (ex nom de travail « AgentData »). Repo : `github.com/phenicea/agentdata`.
 > Langue du doc : français + termes techniques en anglais. Le code, lui, peut être en anglais.
+>
+> **Ce fichier = stratégie & plan (stable).** L'**exécution réelle** (décisions datées, jalons, état live)
+> vit dans [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md) et les ADR ([`decisions/adr/`](decisions/adr/)).
+> État résumé en §12 (avancement) et §16 (journal). MAJ : 2026-06-18.
 
 ---
 
@@ -167,16 +171,27 @@ Skills/outils Claude Code à mobiliser selon les besoins :
 
 ---
 
-## 12. ROADMAP A → Z (PHASÉE)
+## 12. ROADMAP A → Z (PHASÉE) — avancement au 2026-06-18
 
-- **Phase 0 — Cadrage.** Vérifs §6 : sous-niche précise (via x402scan), ToS des sources, docs live, choix de chaîne(s).
-- **Phase 1 — Endpoint local.** Data fetcher → compute/normalize → API JSON propre. Tests unitaires sur la logique de calcul.
-- **Phase 2 — Paiement (testnet).** Middleware x402, wallet, règlement USDC sur testnet. Valider le flux 402 → pay → serve de bout en bout.
-- **Phase 3 — Découvrabilité.** `llms.txt`, OpenAPI, docs markdown, serveur MCP.
-- **Phase 4 — Listing partout.** BlockRun (contact t.me/bc1max), Bazaar, MCP Registry, npm.
-- **Phase 5 — Mainnet + monitoring.** Revue sécurité du code qui touche aux fonds → passage mainnet/vrai USDC. Suivi : appels/jour, latence, taux d'erreur, revenus.
-- **Phase 6 — Portefeuille.** Ajouter d'autres endpoints (2 niches + 2 gros volumes), qui se vendent mutuellement.
-- **Phase 7 — Évolution : routeur/réputation.** Voir §13.
+> Endpoint #1 = **« liquidité exécutable / coût de sortie & fragilité »** sur **Base** (Python/FastAPI, sourcing
+> on-chain). Exactitude prouvée : 0,0000 bps vs `getAmountOut` on-chain (Aerodrome volatile + stable).
+
+- ✅ **Phase 0 — Cadrage.** Fait (sous-niche, ToS, docs live, Base d'abord / Solana = endpoint #2).
+- ✅ **Phase 1 — Endpoint local.** Fait. compute/chain/api/monitoring + tests.
+- ✅ **Phase 2 — Paiement (testnet).** Fait. Middleware x402 opt-in ; flux 402 → pay → serve validé E2E (Base Sepolia,
+  facilitator x402.org, $0 accepté). Mainnet doublement verrouillé (`safety.guard_network`, `ALLOW_MAINNET` absent).
+- ✅ **Phase 3 — Découvrabilité.** Fait. `llms.txt`, OpenAPI, docs markdown, serveur MCP (streamable-http), landing `/`.
+- 🟡 **Phase 4 — Listing partout.** En cours :
+  - ✅ **MCP Registry** : LIVE — `io.github.phenicea/agentdata-liquidity-exit-cost` v0.1.0.
+  - ⏸️ **x402 Bazaar** : code prêt (extension gated) ; bloqué côté écosystème (`/discovery/resources` x402.org = 404).
+  - 🟡 **x402scan** : nécessite une instance publique payments-ON (2e instance `agentdata-pay`, testnet) — en cours.
+  - 🟡 **BlockRun** (`t.me/bc1max`) : kit prêt (OpenAPI/llms.txt/docs/402 démontrable) ; contact = action humaine.
+  - ➖ **npm** : non requis (serveur remote se liste sans package).
+- ⏳ **Phase 5 — Mainnet + monitoring.** NON commencée — **porte humaine** (revue sécurité fonds avant tout vrai USDC).
+  Monitoring déjà actif (uptime, latence p50/p95, erreurs, appels) + `/dashboard`.
+- ⏳ **Phase 6 — Portefeuille.** Endpoint #2 (sécurité de tx) = squelette optionnel, non démarré. `PaymentRail` posé
+  (interface rail-agnostique + adapter x402 only) pour empiler proprement.
+- ⏳ **Phase 7 — Routeur/réputation.** Voir §13. (Monitoring = socle de score déjà en place.)
 
 ---
 
@@ -204,12 +219,12 @@ Une fois plusieurs endpoints en place et du volume/un historique acquis, monter 
 ## 15. DEFINITION OF DONE & MÉTRIQUES
 
 MVP « fait » quand :
-- [ ] Endpoint live qui sert de la donnée calculée/normalisée en JSON propre.
-- [ ] Flux x402 fonctionnel (testnet validé, puis mainnet).
-- [ ] `llms.txt` + OpenAPI + serveur MCP en place.
-- [ ] Listé sur : BlockRun, x402 Bazaar, MCP Registry (+ npm).
-- [ ] Premiers appels payés reçus.
-- [ ] Monitoring actif (appels/jour, latence, taux d'erreur).
+- [x] Endpoint live qui sert de la donnée calculée/normalisée en JSON propre. *(Render, testnet.)*
+- [x] Flux x402 fonctionnel (testnet validé). *(E2E 402→pay→serve OK ; mainnet = porte humaine, non franchie.)*
+- [x] `llms.txt` + OpenAPI + serveur MCP en place.
+- [~] Listé sur : **MCP Registry ✅** ; BlockRun / x402 Bazaar / x402scan = en cours (npm non requis).
+- [ ] Premiers appels payés reçus. *(testnet $0 ; mainnet non franchi → revenu réel pas encore visé.)*
+- [x] Monitoring actif (appels/jour, latence p50/p95, taux d'erreur) + `/dashboard`.
 
 Métriques à suivre ensuite : appels/jour, latence p50/p95, taux d'erreur, taux de rachat, revenu brut, marge.
 
@@ -226,3 +241,16 @@ Métriques à suivre ensuite : appels/jour, latence p50/p95, taux d'erreur, taux
 - **Cadrage** : marché encore petit → pari de positionnement, démarrage pas cher, revenu modeste au début.
 - **Évolution** : empiler des endpoints → monter vers un routeur de réputation.
 - **Écartés en route** : gateway rival de BlockRun (trop tard/dur), x402 « moins cher » (course vers le bas vs standard ouvert gratuit), lending Ika (riba), perps/prédiction (maysir).
+
+### Organisation & exécution (ajouts)
+- **Marque** : projet renommé **Phenicea** (namespace MCP `io.github.phenicea/...`, repo `github.com/phenicea/agentdata`).
+- **Agents décisionnels** : `ceo-agent` (business) et `cto-agent` (technique) dans `.claude/agents/`. Règle : **toute
+  décision business passe d'abord par le CEO, puis on exécute** ; tout code passe par un **pipeline multi-agents**
+  (3-5 codeurs supervisés CTO → 3-5 testeurs/sécurité). Décisions tracées dans `decisions/DECISION_LOG.md`.
+- **Endpoint #1 figé** : « liquidité exécutable / coût de sortie & fragilité » (pas slippage brut), Base, 3 tiers
+  (quote $0.008 / risk $0.02 défaut / deep $0.04 ; testnet $0), sourcing on-chain (droit de redistribution propre).
+- **Jalons** : E2E x402 testnet validé (facilitator x402.org accepte $0) ; exactitude AMM prouvée 0,0000 bps vs on-chain ;
+  **listing #1 MCP Registry LIVE (2026-06-18)**.
+- **Garde-fous argent** : testnet par défaut ; mainnet refusé au démarrage ET par requête sans `ALLOW_MAINNET` ;
+  clé privée jamais en repo (seule l'adresse publique `PAY_TO_ADDRESS`). Mainnet/vrai USDC = escalade humaine.
+- **NB fichier** : un doublon `CLAUDE (1).md` (téléchargement) traîne à la racine ; la source de vérité est **`CLAUDE.md`**.
